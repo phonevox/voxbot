@@ -1,3 +1,12 @@
+## [1.1.4](https://github.com/phonevox/voxbot/compare/v1.1.3...v1.1.4) (2025-05-09)
+
+
+### Bug Fixes
+
+* deploy issues ([1aff023](https://github.com/phonevox/voxbot/commit/1aff023398c8035ae0bf6ef4ce3dfa6a37c92cfa))
+
+
+
 ## [1.1.3](https://github.com/phonevox/voxbot/compare/v1.1.2...v1.1.3) (2025-05-09)
 
 
