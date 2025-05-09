@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  bot:
+    container_name: voxbot
+    build: .
+    restart: always  # Reinicia automaticamente em caso de falha
+    env_file: .env   # Usa as variáveis do .env
+    volumes:
+      - ./logs:/app/logs  # Permite persistir logs no host

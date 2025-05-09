@@ -1,0 +1,58 @@
+name: Releases
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Generate Changelog
+        id: changelog
+        uses: TriPSs/conventional-changelog-action@v3.7.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version-file: ./lib/version.json
+          version-path: version
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        if: ${{ steps.changelog.outputs.skipped == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.changelog.outputs.tag }}
+          release_name: ${{ steps.changelog.outputs.tag }}
+          body: ${{ steps.changelog.outputs.clean_changelog }}
+          draft: false
+          prerelease: false
+    
+      - name: Dispatch Release Event
+        run: |
+            gh api repos/${{ github.repository }}/dispatches \
+                --method POST \
+                --header "Accept: application/vnd.github.everest-preview+json" \
+                --input - <<EOF
+            {
+                "event_type": "deploy-${{ steps.changelog.outputs.tag }}",
+                "client_payload": {
+                "tag": "${{ steps.changelog.outputs.tag }}"
+                }
+            }
+            EOF
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+
+
+  
