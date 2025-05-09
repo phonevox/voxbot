@@ -17,6 +17,5 @@ jobs:
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            cd /home/deploybot
-            ./deploy.sh "${{ github.event.client_payload.tag }}" "${{ secrets.ENV_FILE }}"
+            sudo /home/${{ secrets.DEPLOY_SSH_USER }}/deploy.sh "${{ github.event.client_payload.tag }}" "${{ secrets.ENV_FILE }}"
             
