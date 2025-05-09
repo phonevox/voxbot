@@ -17,6 +17,6 @@ jobs:
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            "${{ github.event.client_payload.tag }}"
+            ${{ github.event.client_payload.tag }}
             "${{ secrets.ENV_FILE }}"
             
