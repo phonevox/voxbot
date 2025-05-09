@@ -20,7 +20,7 @@ jobs:
         uses: TriPSs/conventional-changelog-action@v3.7.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          version-file: ./lib/version.json
+          version-file: ./src/lib/version.json
           version-path: version
 
       - name: Create Release
