@@ -1,7 +1,9 @@
-import typing
 import logging
+import typing
+
 from pymongo.collection import Collection
 from pymongo.errors import ServerSelectionTimeoutError
+
 
 class GuildDataManager:
     def __init__(self, collection: Collection, module_name: str):
@@ -59,9 +61,8 @@ class GuildDataManager:
     def refresh_cache_from_db(self, guild_id: int):
         data = self.db.find_one({"GUILD_ID": guild_id})
         self.cache[guild_id] = data or {}
-        
+
     def for_guild(self, guild_id: int) -> dict:
         if guild_id not in self.cache:
             self.refresh_cache_from_db(guild_id)
         return self.cache[guild_id]
-
