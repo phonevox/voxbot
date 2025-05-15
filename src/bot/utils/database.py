@@ -1,12 +1,14 @@
 import logging
 import os
+
 from pymongo import MongoClient
 
 logger = logging.getLogger("bot.database")
 
+
 class DatabaseClient:
     _instance = None
-    
+
     def __new__(cls):
         if not cls._instance:
             cls._instance = super().__new__(cls)
@@ -19,8 +21,6 @@ class DatabaseClient:
 
     def __aexit__(self, exc_type, exc_val, exc_tb):
         self.client.close()
-    
+
     def get_collection(self, collection_name):
         return self.database[collection_name]
-    
-    

@@ -1,9 +1,10 @@
 import time
 
+
 class Cache:
     def __init__(self, ttl=None):
         self.cache = {}  # key: (data, timestamp, ttl)
-        self.ttl = ttl   # default TTL (global)
+        self.ttl = ttl  # default TTL (global)
 
     def get(self, key, fallback=None):
         if key in self.cache:
@@ -21,7 +22,7 @@ class Cache:
     def delete(self, key):
         if key in self.cache:
             del self.cache[key]
-            
+
     def find(self, startswith=None, endswith=None, contains=None):
         """
         Returns a dictionary with entries whose keys corresponds with the search criteria
@@ -32,7 +33,9 @@ class Cache:
         Only returns valid entries (within TTL).
         """
         result = {}
-        for k in list(self.cache.keys()):  # list() evita erro de modificação durante iteração
+        for k in list(
+            self.cache.keys()
+        ):  # list() evita erro de modificação durante iteração
             data = self.get(k)  # verifica se ainda está válido (TTL)
             if data is None:
                 continue
@@ -44,8 +47,6 @@ class Cache:
                 continue
             result[k] = data
         return result
-
-        
 
     def clear(self):
         self.cache = {}
