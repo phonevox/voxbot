@@ -56,15 +56,17 @@ class ModuleJoinToCreate(commands.Cog):
 
             # Easter egg para nome do canal temporário
             if "rafael" in member_display_name.lower():
-                channel_name = f"☂ {member_display_name}'s room"
+                channel_name = f"☂ Sala de {member_display_name}"
             elif "adrian" in member_display_name.lower():
-                channel_name = f"💫 {member_display_name}'s room"
+                channel_name = f"💫 Sala de {member_display_name}"
             elif "andr" in member_display_name.lower():
                 channel_name = f"🎀 𝓈𝒶𝓁𝒶 𝒹𝓊 𝒶𝓃𝒹𝓇𝑒𝑒𝒽 🎀"
             elif "leonardo" in member_display_name.lower():
-                channel_name = f"🎸 {member_display_name}'s room"
+                channel_name = f"🎸 Sala de {member_display_name}"
+            elif "abner" in member_display_name.lower():
+                channel_name = f"👑 Sala de {member_display_name}"
             else:
-                channel_name = f"{member_display_name}'s room"
+                channel_name = f"Sala de {member_display_name}"
 
             # Cria canal temporário
             new_channel = await member.guild.create_voice_channel(
