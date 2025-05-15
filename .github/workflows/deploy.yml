@@ -19,4 +19,16 @@ jobs:
           script: |
             ${{ github.event.client_payload.tag }}
             "${{ secrets.ENV_FILE }}"
-            
+
+      - name: Disparar Sync main → development
+        run: |
+          gh api repos/${{ github.repository }}/dispatches \
+            --method POST \
+            --header "Accept: application/vnd.github.everest-preview+json" \
+            --input - <<EOF
+          {
+            "event_type": "sync-main-to-dev"
+          }
+          EOF
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

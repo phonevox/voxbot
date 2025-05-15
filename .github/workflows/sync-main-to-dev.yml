@@ -1,9 +1,9 @@
 name: Sync main to development
 
 on:
-  push:
-    branches:
-      - main
+  repository_dispatch:
+    types:
+      - sync-main-to-dev
 
 jobs:
   sync:
