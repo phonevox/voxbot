@@ -1,3 +1,12 @@
+## [1.2.4](https://github.com/phonevox/voxbot/compare/v1.2.3...v1.2.4) (2025-05-15)
+
+
+### Bug Fixes
+
+* cicd test ([cb75574](https://github.com/phonevox/voxbot/commit/cb7557498604ecef36f42c40da1c903b6439d339))
+
+
+
 ## [1.2.3](https://github.com/phonevox/voxbot/compare/v1.2.2...v1.2.3) (2025-05-15)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * jointocreate module ([6eaaf21](https://github.com/phonevox/voxbot/commit/6eaaf2141ffd9345bc4f50e4b046c9fa09c3b554))
-
-
-
-## [1.1.5](https://github.com/phonevox/voxbot/compare/v1.1.4...v1.1.5) (2025-05-09)
-
-
-### Bug Fixes
-
-* deploy issues ([6b20b05](https://github.com/phonevox/voxbot/commit/6b20b055e7493f23952371755360b67fcf3816f9))
 
 
 
