@@ -1,3 +1,12 @@
+# [1.3.0](https://github.com/phonevox/voxbot/compare/v1.2.4...v1.3.0) (2025-05-15)
+
+
+### Features
+
+* remodel for tbd ([#22](https://github.com/phonevox/voxbot/issues/22)) ([3e0d5e4](https://github.com/phonevox/voxbot/commit/3e0d5e45e4879baa10b5833f1a58efedecb6aa90))
+
+
+
 ## [1.2.4](https://github.com/phonevox/voxbot/compare/v1.2.3...v1.2.4) (2025-05-15)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * ci/cd workflow, Dockerfile entrypoint change ([125f8ca](https://github.com/phonevox/voxbot/commit/125f8cae52f0c9ad3ff07d61efbe524af6aab02c))
-
-
-
-# [1.2.0](https://github.com/phonevox/voxbot/compare/v1.1.5...v1.2.0) (2025-05-15)
-
-
-### Features
-
-* jointocreate module ([6eaaf21](https://github.com/phonevox/voxbot/commit/6eaaf2141ffd9345bc4f50e4b046c9fa09c3b554))
 
 
 
