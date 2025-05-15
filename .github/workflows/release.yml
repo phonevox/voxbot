@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   changelog:
@@ -34,25 +35,39 @@ jobs:
           body: ${{ steps.changelog.outputs.clean_changelog }}
           draft: false
           prerelease: false
-    
-      - name: Dispatch Release Event
+
+      - name: Dispatch Deploy Event
+        if: ${{ steps.changelog.outputs.skipped == 'false' }}
         run: |
-            gh api repos/${{ github.repository }}/dispatches \
-                --method POST \
-                --header "Accept: application/vnd.github.everest-preview+json" \
-                --input - <<EOF
-            {
-                "event_type": "deploy-${{ steps.changelog.outputs.tag }}",
-                "client_payload": {
-                "tag": "${{ steps.changelog.outputs.tag }}"
-                }
+          gh api repos/${{ github.repository }}/dispatches \
+            --method POST \
+            --header "Accept: application/vnd.github.everest-preview+json" \
+            --input - <<EOF
+          {
+            "event_type": "deploy-${{ steps.changelog.outputs.tag }}",
+            "client_payload": {
+              "tag": "${{ steps.changelog.outputs.tag }}"
             }
-            EOF
+          }
+          EOF
         env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Sync main to development
+        id: sync_pr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: sync version bump from main to development"
+          title: "Sync main to development"
+          body: |
+            This PR syncs the automatic version bump from main to development.
+          base: development
+          branch: sync/main-to-dev
 
-
-
-
-  
+      - name: Auto-merge sync PR
+        if: ${{ steps.sync_pr.outputs.pull-request-url }}
+        run: |
+          gh pr merge "${{ steps.sync_pr.outputs.pull-request-url }}" --merge --admin --delete-branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
