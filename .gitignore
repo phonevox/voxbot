@@ -2,3 +2,4 @@
 /logs
 dev/
 *pycache*
+tests/

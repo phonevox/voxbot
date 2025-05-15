@@ -90,7 +90,7 @@ class DiscordBot(commands.Bot):  # Mudamos para herdar de commands.Bot
             logger.exception(f"setup_hook: error loading\n{e}")
 
     async def load_cogs(self) -> None:
-        cog_dirs = ["bot.commands", "bot.events", "bot.modules"] # from root dir, represents ./bot/commands ./bot/events ./bot/modules
+        cog_dirs = ["src/bot/commands", "src/bot/events", "src/bot/modules"] # from root dir, represents ./bot/commands ./bot/events ./bot/modules
         sucessful_cogs = []
         failed_cogs = []
         cogloader_start_time = time.time()

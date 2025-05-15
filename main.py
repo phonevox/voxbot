@@ -3,12 +3,12 @@ import logging
 import logging.handlers
 import os
 import colorlog
-import src.utils.logging as logutils
+import src.bot.utils.logging as lutils
 from aiohttp import ClientSession
 from dotenv import load_dotenv
 from typing import List, Optional
 
-from src.lib.DiscordBot import DiscordBot
+from src.bot.core.DiscordBot import DiscordBot
 
 async def main():
     """main func"""
@@ -40,7 +40,7 @@ async def main():
         file_formatter = logging.Formatter("[{asctime}] [{levelname:<8}] {name}: {message}", date_format, style="{")
         file_handler.setFormatter(file_formatter)
     
-    console_handler.setFormatter(logutils.color_formatter)
+    console_handler.setFormatter(lutils.color_formatter)
     
     # registering handlers
     if log_volume:
