@@ -1,0 +1,25 @@
+name: Sync main to development
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create PR from main to development
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: sync main into development"
+          title: "Sync main into development"
+          body: |
+            This PR was automatically created to keep development up to date with main.
+          base: development
+          branch: sync/main-to-dev
