@@ -1,3 +1,12 @@
+## [1.3.1](https://github.com/phonevox/voxbot/compare/v1.3.0...v1.3.1) (2025-05-15)
+
+
+### Bug Fixes
+
+* remove sync part from deploy workflow ([#23](https://github.com/phonevox/voxbot/issues/23)) ([800f071](https://github.com/phonevox/voxbot/commit/800f07152ec97a417430fd3fad0ad5f7ff1c9331))
+
+
+
 # [1.3.0](https://github.com/phonevox/voxbot/compare/v1.2.4...v1.3.0) (2025-05-15)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * ci/cd deployment issue ([50d5a57](https://github.com/phonevox/voxbot/commit/50d5a57c92e558d1de31d0e019fee91ec09f3c57))
-
-
-
-## [1.2.1](https://github.com/phonevox/voxbot/compare/v1.2.0...v1.2.1) (2025-05-15)
-
-
-### Bug Fixes
-
-* ci/cd workflow, Dockerfile entrypoint change ([125f8ca](https://github.com/phonevox/voxbot/commit/125f8cae52f0c9ad3ff07d61efbe524af6aab02c))
 
 
 
