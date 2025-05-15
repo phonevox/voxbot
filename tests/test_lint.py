@@ -7,7 +7,9 @@ def test_black():
 
 
 def test_isort():
-    result = subprocess.run(["isort", ".", "--check-only"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["isort", ".", "--check-only"], capture_output=True, text=True
+    )
     assert result.returncode == 0, f"Isort errors:\n{result.stdout}{result.stderr}"
 
 
