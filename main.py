@@ -46,6 +46,7 @@ async def main():
 
     # registering handlers
     if log_volume:
+        variavel_nao_usada = "test"
         discord_logger.addHandler(file_handler)
         fc_logger.addHandler(file_handler)
 
@@ -66,3 +67,5 @@ async def main():
 if __name__ == "__main__":
     load_dotenv()
     asyncio.run(main())
+
+# testing
