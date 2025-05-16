@@ -1,3 +1,12 @@
+## [1.4.2](https://github.com/phonevox/voxbot/compare/v1.4.1...v1.4.2) (2025-05-16)
+
+
+### Reverts
+
+* Revert "fix: just a test (#25)" (#26) ([d957b20](https://github.com/phonevox/voxbot/commit/d957b204bc55eaaae80530505e6123a6671d5848)), closes [#25](https://github.com/phonevox/voxbot/issues/25) [#26](https://github.com/phonevox/voxbot/issues/26)
+
+
+
 ## [1.4.1](https://github.com/phonevox/voxbot/compare/v1.4.0...v1.4.1) (2025-05-16)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * remodel for tbd ([#22](https://github.com/phonevox/voxbot/issues/22)) ([3e0d5e4](https://github.com/phonevox/voxbot/commit/3e0d5e45e4879baa10b5833f1a58efedecb6aa90))
-
-
-
-## [1.2.4](https://github.com/phonevox/voxbot/compare/v1.2.3...v1.2.4) (2025-05-15)
-
-
-### Bug Fixes
-
-* cicd test ([cb75574](https://github.com/phonevox/voxbot/commit/cb7557498604ecef36f42c40da1c903b6439d339))
 
 
 
