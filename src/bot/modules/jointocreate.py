@@ -2,7 +2,7 @@
 import logging
 
 import discord
-from discord import Interaction, VoiceChannel, app_commands
+from discord import Interaction, Member, VoiceChannel, app_commands
 from discord.ext import commands
 
 from src.bot.core.GuildDataManager import GuildDataManager
@@ -41,7 +41,7 @@ class ModuleJoinToCreate(commands.Cog):
         logger = self.__getLogger("on_voice_state_update")
         guild_id = member.guild.id
         data = self.gdm.for_guild(guild_id)
-        monitored_channels = data.get("channels") or []
+        monitored_channels = data.get("ID_JTC_CHANNELS") or []
 
         # Verifica se o bot tem permissão para criar/deletar canais
         bot_member = member.guild.me
@@ -52,21 +52,16 @@ class ModuleJoinToCreate(commands.Cog):
         # Quando o membro entra em um canal monitorado
         if after.channel and after.channel.id in monitored_channels:
             category = after.channel.category  # mantém a categoria do canal original
+            member_id = str(member.id)
             member_display_name = member.display_name
 
-            # Easter egg para nome do canal temporário
-            if "rafael" in member_display_name.lower():
-                channel_name = f"☂ Sala de {member_display_name}"
-            elif "adrian" in member_display_name.lower():
-                channel_name = f"💫 Sala de {member_display_name}"
-            elif "andr" in member_display_name.lower():
-                channel_name = f"🎀 𝓈𝒶𝓁𝒶 𝒹𝓊 𝒶𝓃𝒹𝓇𝑒𝑒𝒽 🎀"  # noqa
-            elif "leonardo" in member_display_name.lower():
-                channel_name = f"🎸 Sala de {member_display_name}"
-            elif "abner" in member_display_name.lower():
-                channel_name = f"👑 Sala de {member_display_name}"
-            else:
-                channel_name = f"Sala de {member_display_name}"
+            # Busca alias personalizado
+            data = self.gdm.for_guild(member.guild.id)
+            aliases = data.get("TEMP_CHANNEL_ALIASES") or {}
+            alias = aliases.get(f"{member_id}")  # key is a string
+
+            # Define o nome do canal
+            channel_name = alias or f"Sala de {member_display_name}"
 
             # Cria canal temporário
             new_channel = await member.guild.create_voice_channel(
@@ -115,7 +110,7 @@ class ModuleJoinToCreate(commands.Cog):
             data = self.cog.gdm.for_guild(
                 interaction.guild_id
             )  # pega o dicionário cacheado
-            channels = data.get("channels") or []
+            channels = data.get("ID_JTC_CHANNELS") or []
 
             if channel.id in channels:
                 await interaction.response.send_message(
@@ -125,8 +120,8 @@ class ModuleJoinToCreate(commands.Cog):
 
             channels.append(channel.id)
 
-            self.cog.gdm.set(interaction.guild_id, "channels", channels)
-            data["channels"] = channels
+            self.cog.gdm.set(interaction.guild_id, "ID_JTC_CHANNELS", channels)
+            data["ID_JTC_CHANNELS"] = channels
 
             await interaction.response.send_message(
                 f"✅ Canal {channel.mention} cadastrado como Join-To-Create!",
@@ -139,7 +134,7 @@ class ModuleJoinToCreate(commands.Cog):
         @app_commands.describe(channel="Canal de voz a ser removido")
         async def delete(self, interaction: Interaction, channel: VoiceChannel):
             data = self.cog.gdm.for_guild(interaction.guild_id)
-            channels = data.get("channels") or []
+            channels = data.get("ID_JTC_CHANNELS") or []
 
             if channel.id not in channels:
                 await interaction.response.send_message(
@@ -149,8 +144,8 @@ class ModuleJoinToCreate(commands.Cog):
 
             channels.remove(channel.id)
 
-            self.cog.gdm.set(interaction.guild_id, "channels", channels)
-            data["channels"] = channels
+            self.cog.gdm.set(interaction.guild_id, "ID_JTC_CHANNELS", channels)
+            data["ID_JTC_CHANNELS"] = channels
 
             await interaction.response.send_message(
                 f"✅ Canal {channel.mention} removido com sucesso!", ephemeral=True
@@ -161,7 +156,7 @@ class ModuleJoinToCreate(commands.Cog):
         )
         async def list(self, interaction: Interaction):
             data = self.cog.gdm.for_guild(interaction.guild_id)
-            channel_ids = data.get("channels") or []
+            channel_ids = data.get("ID_JTC_CHANNELS") or []
 
             if not channel_ids:
                 await interaction.response.send_message(
@@ -179,6 +174,81 @@ class ModuleJoinToCreate(commands.Cog):
 
             await interaction.response.send_message(
                 "✅ Canais Join-To-Create configurados:\n" + "\n".join(lines),
+                ephemeral=True,
+            )
+
+        @app_commands.command(
+            name="set-alias",
+            description="Define um alias para o canal temporário para o usuário especificado",
+        )
+        async def set_alias(self, interaction: Interaction, user: Member, alias: str):
+            pass
+            data = self.cog.gdm.for_guild(interaction.guild_id)
+            aliases = data.get("TEMP_CHANNEL_ALIASES") or {}
+
+            # first, check if alias has more than 100 characters
+            if len(alias) > 100:
+                await interaction.response.send_message(
+                    "❌ O alias não pode ter mais de 100 caracteres.", ephemeral=True
+                )
+                return
+
+            # set new alias in guild configuration
+            aliases[f"{user.id}"] = alias
+            self.cog.gdm.set(interaction.guild_id, "TEMP_CHANNEL_ALIASES", aliases)
+
+            await interaction.response.send_message(
+                "✅ Alias definido com sucesso!", ephemeral=True
+            )
+
+        @app_commands.command(
+            name="remove-alias",
+            description="Remove o alias de canal temporário para o usuário especificado",
+        )
+        async def remove_alias(self, interaction: Interaction, user: Member):
+            data = self.cog.gdm.for_guild(interaction.guild_id)
+            aliases = data.get("TEMP_CHANNEL_ALIASES") or {}
+
+            if f"{user.id}" not in aliases:
+                await interaction.response.send_message(
+                    "❌ Este usuário não possui um alias definido.", ephemeral=True
+                )
+                return
+
+            # remove alias from guild configuration
+            del aliases[f"{user.id}"]
+            self.cog.gdm.set(interaction.guild_id, "TEMP_CHANNEL_ALIASES", aliases)
+
+            await interaction.response.send_message(
+                "✅ Alias removido com sucesso!", ephemeral=True
+            )
+
+        @app_commands.command(
+            name="list-aliases",
+            description="Lista os aliases de canal temporário configurados",
+        )
+        async def list_aliases(self, interaction: Interaction):
+            data = self.cog.gdm.for_guild(interaction.guild_id)
+            aliases = data.get("TEMP_CHANNEL_ALIASES") or {}
+
+            if not aliases:
+                await interaction.response.send_message(
+                    "😬 Nenhum alias de canal temporário configurado.", ephemeral=True
+                )
+                return
+
+            lines = []
+            for user_id, alias in aliases.items():
+                user = interaction.guild.get_member(int(user_id))
+                if user:
+                    lines.append(f"- {user.mention} (`{alias}`)")
+                else:
+                    lines.append(
+                        f"- Usuário desconhecido (`ID: {user_id}`) → `{alias}`"
+                    )
+
+            await interaction.response.send_message(
+                "📋 Aliases de canal temporário configurados:\n" + "\n".join(lines),
                 ephemeral=True,
             )
 
