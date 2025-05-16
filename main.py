@@ -47,6 +47,7 @@ async def main():
     # registering handlers
     if log_volume:
         variavel_nao_usada = "test"
+        print(f"{variavel_nao_usada}")
         discord_logger.addHandler(file_handler)
         fc_logger.addHandler(file_handler)
 
