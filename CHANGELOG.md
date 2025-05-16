@@ -1,3 +1,12 @@
+# [1.4.0](https://github.com/phonevox/voxbot/compare/v1.3.1...v1.4.0) (2025-05-16)
+
+
+### Features
+
+* jointocreate set-alias, remove-alias and list-aliases ([#24](https://github.com/phonevox/voxbot/issues/24)) ([7f346d3](https://github.com/phonevox/voxbot/commit/7f346d381579cafd798abe78705d6bee4efe3670))
+
+
+
 ## [1.3.1](https://github.com/phonevox/voxbot/compare/v1.3.0...v1.3.1) (2025-05-15)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * ci/cd stuff ([e2d4bcd](https://github.com/phonevox/voxbot/commit/e2d4bcd6e477c2a9f15b395b848c7e8a16ac7653))
-
-
-
-## [1.2.2](https://github.com/phonevox/voxbot/compare/v1.2.1...v1.2.2) (2025-05-15)
-
-
-### Bug Fixes
-
-* ci/cd deployment issue ([50d5a57](https://github.com/phonevox/voxbot/commit/50d5a57c92e558d1de31d0e019fee91ec09f3c57))
 
 
 
