@@ -1,3 +1,12 @@
+## [1.4.1](https://github.com/phonevox/voxbot/compare/v1.4.0...v1.4.1) (2025-05-16)
+
+
+### Bug Fixes
+
+* just a test ([#25](https://github.com/phonevox/voxbot/issues/25)) ([6ca6cb9](https://github.com/phonevox/voxbot/commit/6ca6cb96d58eb8a836564dc7d3ab888f0847dc7c))
+
+
+
 # [1.4.0](https://github.com/phonevox/voxbot/compare/v1.3.1...v1.4.0) (2025-05-16)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * cicd test ([cb75574](https://github.com/phonevox/voxbot/commit/cb7557498604ecef36f42c40da1c903b6439d339))
-
-
-
-## [1.2.3](https://github.com/phonevox/voxbot/compare/v1.2.2...v1.2.3) (2025-05-15)
-
-
-### Bug Fixes
-
-* ci/cd stuff ([e2d4bcd](https://github.com/phonevox/voxbot/commit/e2d4bcd6e477c2a9f15b395b848c7e8a16ac7653))
 
 
 
