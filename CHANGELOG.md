@@ -1,3 +1,12 @@
+# [1.5.0](https://github.com/phonevox/voxbot/compare/v1.4.2...v1.5.0) (2025-05-20)
+
+
+### Features
+
+* deskhelper chatbot module ([#27](https://github.com/phonevox/voxbot/issues/27)) ([3a94e8a](https://github.com/phonevox/voxbot/commit/3a94e8a4b801a1768c40d1bb506473a3e86d5048))
+
+
+
 ## [1.4.2](https://github.com/phonevox/voxbot/compare/v1.4.1...v1.4.2) (2025-05-16)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * remove sync part from deploy workflow ([#23](https://github.com/phonevox/voxbot/issues/23)) ([800f071](https://github.com/phonevox/voxbot/commit/800f07152ec97a417430fd3fad0ad5f7ff1c9331))
-
-
-
-# [1.3.0](https://github.com/phonevox/voxbot/compare/v1.2.4...v1.3.0) (2025-05-15)
-
-
-### Features
-
-* remodel for tbd ([#22](https://github.com/phonevox/voxbot/issues/22)) ([3e0d5e4](https://github.com/phonevox/voxbot/commit/3e0d5e45e4879baa10b5833f1a58efedecb6aa90))
 
 
 
