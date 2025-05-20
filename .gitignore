@@ -2,3 +2,5 @@
 /logs
 dev/
 *pycache*
+.pytest_cache
+.mypy_cache
