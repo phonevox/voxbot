@@ -63,10 +63,16 @@ class ModuleJoinToCreate(commands.Cog):
             # Define o nome do canal
             channel_name = alias or f"Sala de {member_display_name}"
 
-            # Cria canal temporário
+            # Copia as permissões do canal original
+            overwrites = after.channel.overwrites
+
+            # Cria o canal com as mesmas permissões
             new_channel = await member.guild.create_voice_channel(
-                name=channel_name, category=category
+                name=channel_name,
+                category=category,
+                overwrites=overwrites
             )
+
             self.temporary_channels.add(new_channel.id)
             logger.info(
                 f"Criado novo canal: {new_channel.name} para {member_display_name}"
