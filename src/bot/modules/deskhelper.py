@@ -53,6 +53,59 @@ class ModuleDeskHelper(commands.Cog):
 
     # Listeners
 
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    # TODO: Salvar as sessões criadas no db
+    # TODO: Carregar as sessões do db
+    # TODO: Cadastrar um tempo limite pra cada thread (15min inativo por exemplo, então o cache deve um campo de last_active ou algo assim)
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        logger = self.__getLogger("load_sessions")
+        logger.info("Carregando sessões...")
+        logger.trace(f"BOT GUILDS: {self.bot.guilds}")
+        for guild in self.bot.guilds:
+            logger.trace(f"Carregando sessões para o servidor {guild.name} ({guild.id})...")
+            data = self.gdm.for_guild(guild.id)
+            saved_sessions = data.get("THREAD_SESSIONS") or {}
+            logger.trace(f"Sessões salvas: {saved_sessions}")
+            updated_sessions = {}
+
+            for thread_id_str, session_data in saved_sessions.items():
+                try:
+                    thread_id = int(thread_id_str)
+                    session_id = session_data["session_id"]
+                    last_active = datetime.fromisoformat(session_data["last_active"])
+
+                    if datetime.utcnow() - last_active >= self.SESSION_TIMEOUT:
+                        # Sessão expirada → tenta deletar o thread
+                        try:
+                            thread = await self.bot.fetch_channel(thread_id)
+                            if isinstance(thread, discord.Thread):
+                                await thread.delete(reason="Sessão de chatbot expirada")
+                                logger.info(f"Thread expirada deletada: {thread.name} ({thread_id})")
+                        except discord.NotFound:
+                            logger.warning(f"Thread não encontrada ao tentar deletar: {thread_id}")
+                        except Exception as e:
+                            logger.error(f"Erro ao deletar thread {thread_id}: {e}")
+                        continue  # não mantém a sessão
+
+                    # Sessão ainda válida → mantém no cache
+                    self.sessions[thread_id] = {
+                        "session_id": session_id,
+                        "last_active": last_active,
+                    }
+                    updated_sessions[thread_id_str] = {
+                        "session_id": session_id,
+                        "last_active": last_active.isoformat(),
+                    }
+
+                except Exception as e:
+                    logger.warning(f"Erro ao carregar sessão de thread {thread_id_str}: {e}")
+
+            # Salva apenas sessões ainda válidas
+            self.gdm.set(guild.id, "THREAD_SESSIONS", updated_sessions)
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or not message.guild:
@@ -68,21 +121,17 @@ class ModuleDeskHelper(commands.Cog):
 
         self.user_cooldowns[user_id] = now  # Atualiza o timestamp
 
-        # Caso 1: Está em thread com sessão ativa
         if isinstance(message.channel, discord.Thread):
             thread_id = message.channel.id
-            session = self.sessions.get(thread_id)
+            session_id = self.get_or_create_session(thread_id)
 
-            if session:
-                session["last_active"] = now
-                user_input = message.content.strip()
-                if not user_input:
-                    return
-                response = await self.query_chatbot(thread_id, user_input)
-                await message.channel.send(response, reference=message)
+            user_input = message.content.strip()
+            if not user_input:
+                return
+            response = await self.query_chatbot(session_id, user_input, with_execution_link=self.is_debug_mode(message.guild.id))
+            await message.channel.send(response, reference=message)
             return
 
-        # Caso 2: Pingou o bot numa mensagem normal (não thread)
         if (
             self.bot.user.mentioned_in(message)
             and not message.mention_everyone
@@ -100,24 +149,21 @@ class ModuleDeskHelper(commands.Cog):
                 if not user_input:
                     return
 
-                # Cria uma thread a partir da mensagem
                 thread = await message.create_thread(
                     name=f"Atendimento - {message.author.display_name}",
                     auto_archive_duration=60,
                 )
 
-                thread_id = thread.id
-                self.sessions[thread_id] = {
-                    "session_id": str(uuid.uuid4()),
-                    "last_active": now,
-                }
+                session_id = self.get_or_create_session(thread.id)
 
-                response = await self.query_chatbot(
-                    self.sessions[thread_id]["session_id"], user_input
-                )
+                response = await self.query_chatbot(session_id, user_input, with_execution_link=self.is_debug_mode(message.guild.id))
                 await thread.send(response)
 
     # Functions
+
+    def is_debug_mode(self, guild_id: int) -> bool:
+        data = self.gdm.for_guild(guild_id)
+        return data.get("DEBUG_MODE", False)
 
     def get_or_create_session(self, thread_id: int) -> str:
         now = datetime.utcnow()
@@ -125,16 +171,34 @@ class ModuleDeskHelper(commands.Cog):
 
         if session and now - session["last_active"] < self.SESSION_TIMEOUT:
             session["last_active"] = now
-            return session["session_id"]
+        else:
+            session = {
+                "session_id": str(uuid.uuid4()),
+                "last_active": now,
+            }
+            self.sessions[thread_id] = session
 
-        new_session_id = str(uuid.uuid4())
-        self.sessions[thread_id] = {
-            "session_id": new_session_id,
-            "last_active": now,
-        }
-        return new_session_id
+        # Salva no GDM
+        guild_id = self.get_guild_id_from_thread_id(thread_id)
 
-    async def query_chatbot(self, session_id: str, user_input: str) -> str:
+        if guild_id:
+            data = self.gdm.for_guild(guild_id)
+            data_sessions = data.get("THREAD_SESSIONS") or {}
+            data_sessions[str(thread_id)] = {
+                "session_id": session["session_id"],
+                "last_active": session["last_active"].isoformat(),
+            }
+            self.gdm.set(guild_id, "THREAD_SESSIONS", data_sessions)
+
+        return session["session_id"]
+
+    def get_guild_id_from_thread_id(self, thread_id: int) -> int | None:
+        channel = self.bot.get_channel(thread_id)  # tenta do cache local
+        if channel and isinstance(channel, discord.Thread):
+            return channel.guild.id
+        return None
+
+    async def query_chatbot(self, session_id: str, user_input: str, with_execution_link: bool = False) -> str:
         logger = self.__getLogger("query_chatbot")
         url = self.QUERY_CHATBOT_URL
         payload = {
@@ -169,7 +233,13 @@ class ModuleDeskHelper(commands.Cog):
                             and "output" in data
                             and "message" in data["output"]
                         ):
-                            return data["output"]["message"]
+                            message = data["output"]["message"]
+                            execution_link = data["output"]["executionLink"]
+
+                            if with_execution_link:
+                                message = f"{message}\n\n-# [[Ver execução]({execution_link})]"
+
+                            return message
                         else:
                             logger.error("Formato inválido de resposta do chatbot.")
                             raise ValueError("Formato inválido de resposta do chatbot.")
@@ -205,29 +275,39 @@ class ModuleDeskHelper(commands.Cog):
                 return False
             return True
 
-        @app_commands.command(
-            name="clear-sessions", description="Limpa todas as sessões"
-        )
+        @app_commands.command(name="clear-sessions", description="Limpa todas as sessões")
         async def clear_sessions(self, interaction: Interaction):
             self.cog.sessions.clear()
-            await interaction.response.send_message(
-                "✅ Todas as sessões foram limpas.", ephemeral=True
-            )
+            guild_id = interaction.guild_id
+            if guild_id:
+                self.cog.gdm.set(guild_id, "THREAD_SESSIONS", {})
+            await interaction.response.send_message("✅ Todas as sessões foram limpas.", ephemeral=True)
 
-        @app_commands.command(
-            name="session-clear", description="Limpa a sessão de um tópico"
-        )
+        @app_commands.command(name="session-clear", description="Limpa a sessão de um tópico")
         @app_commands.describe(thread="Tópico (thread) cuja sessão será removida")
         async def session_clear(self, interaction: Interaction, thread: discord.Thread):
+            removed = False
+
             if thread.id in self.cog.sessions:
                 del self.cog.sessions[thread.id]
+                removed = True
+
+            guild_id = interaction.guild_id
+            if guild_id:
+                data = self.cog.gdm.for_guild(guild_id)
+                sessions = data.get("THREAD_SESSIONS") or {}
+                if str(thread.id) in sessions:
+                    del sessions[str(thread.id)]
+                    self.cog.gdm.set(guild_id, "THREAD_SESSIONS", sessions)
+                    removed = True
+
+            if removed:
                 await interaction.response.send_message(
                     f"✅ Sessão do tópico `{thread.name}` removida.", ephemeral=True
                 )
             else:
                 await interaction.response.send_message(
-                    f"ℹ️ O tópico `{thread.name}` não possui sessão ativa.",
-                    ephemeral=True,
+                    f"ℹ️ O tópico `{thread.name}` não possui sessão ativa.", ephemeral=True
                 )
 
         @app_commands.command(
@@ -313,9 +393,7 @@ class ModuleDeskHelper(commands.Cog):
                 ephemeral=True,
             )
 
-        @app_commands.command(
-            name="session-list", description="Lista todas as sessões ativas"
-        )
+        @app_commands.command(name="session-list", description="Lista todas as sessões ativas")
         async def session_list(self, interaction: Interaction):
             if not self.cog.sessions:
                 await interaction.response.send_message(
@@ -326,11 +404,33 @@ class ModuleDeskHelper(commands.Cog):
             lines = []
             for thread_id, sess in self.cog.sessions.items():
                 thread = interaction.guild.get_thread(thread_id)
-                name = thread.name if thread else f"`{thread_id}`"
-                lines.append(f"- {name}: `{sess['session_id']}`")
+                timestamp = int(sess["last_active"].timestamp())
+                timestamp -= 3 * 60 * 60  # utc-3
+                if thread:
+                    thread_mention = thread.mention
+                    # name = thread.name
+                else:
+                    thread_mention = f"[Thread {thread_id} não encontrada]"
+                    # name = "desconhecido"
+
+                lines.append(f"- {thread_mention} - `{sess['session_id']}` (<t:{timestamp}:R>)")
 
             await interaction.response.send_message(
                 "📋 Sessões ativas:\n" + "\n".join(lines), ephemeral=True
+            )
+
+        @app_commands.command(name="debug", description="Ativa o modo de depuração baseado em GDM")
+        async def debug(self, interaction: Interaction):
+            guild_id = interaction.guild.id
+            current = self.cog.gdm.get(guild_id, "DEBUG_MODE") or False
+            new_state = not current
+
+            # Salva apenas a chave "DEBUG_MODE"
+            self.cog.gdm.set(guild_id, "DEBUG_MODE", new_state)
+
+            await interaction.response.send_message(
+                f"🛠️ Modo de depuração {'ativado' if new_state else 'desativado'}.",
+                ephemeral=True,
             )
 
 
