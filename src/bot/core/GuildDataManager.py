@@ -24,7 +24,7 @@ class GuildDataManager:
             gid = doc.get("GUILD_ID")
             if gid:
                 self.cache[gid] = doc
-        self.logger.debug(f"Loaded {len(self.cache)} guilds into cache.")
+        self.logger.trace(f"Loaded {len(self.cache)} guilds into cache.")
 
     def get(self, guild_id: int, key: str):
         """Get a value for a specific guild and key."""
