@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import aiohttp
 import discord
-from discord import Interaction, Member, app_commands
+from discord import Interaction, app_commands
 from discord.ext import commands
 
 from src.bot.core.GuildDataManager import GuildDataManager
@@ -55,52 +55,67 @@ class ModuleDeskHelper(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        # Garante que o bot foi mencionado diretamente (não @everyone ou cargos)
+        # Caso 1: Está em thread com sessão ativa
+        if isinstance(message.channel, discord.Thread):
+            thread_id = message.channel.id
+            session = self.sessions.get(thread_id)
+
+            if session:
+                session["last_active"] = datetime.utcnow()
+                user_input = message.content.strip()
+                if not user_input:
+                    return
+                response = await self.query_chatbot(thread_id, user_input)
+                await message.channel.send(response, reference=message)
+            return
+
+        # Caso 2: Pingou o bot numa mensagem normal (não thread)
         if (
             self.bot.user.mentioned_in(message)
             and not message.mention_everyone
             and not message.role_mentions
         ):
-            # Confere se o ping está no início da mensagem
             raw_content = message.content.strip()
-
-            # IDs de menção ao bot podem variar com ou sem "!"
             bot_mentions = [f"<@{self.bot.user.id}>", f"<@!{self.bot.user.id}>"]
 
-            if any(raw_content.startswith(mention) for mention in bot_mentions):
-                # Remove a menção do conteúdo
+            if any(raw_content.startswith(m) for m in bot_mentions):
                 for mention in bot_mentions:
                     if raw_content.startswith(mention):
                         user_input = raw_content[len(mention) :].strip()
                         break
 
-                # Ignora se só tiver o ping, sem conteúdo após
                 if not user_input:
                     return
 
-                user_id = message.author.id
-                session_id = self.get_or_create_session(user_id)
+                # Cria uma thread a partir da mensagem
+                thread = await message.create_thread(
+                    name=f"Atendimento - {message.author.display_name}",
+                    auto_archive_duration=60,
+                )
 
-                # Enviar input e session_id para seu handler externo
-                response = await self.query_chatbot(session_id, user_input)
+                thread_id = thread.id
+                self.sessions[thread_id] = {
+                    "session_id": str(uuid.uuid4()),
+                    "last_active": datetime.utcnow(),
+                }
 
-                await message.channel.send(f"{response}", reference=message)
+                response = await self.query_chatbot(
+                    self.sessions[thread_id]["session_id"], user_input
+                )
+                await thread.send(response)
 
     # Functions
 
-    def get_or_create_session(self, user_id):
+    def get_or_create_session(self, thread_id: int) -> str:
         now = datetime.utcnow()
+        session = self.sessions.get(thread_id)
 
-        session = self.sessions.get(user_id)
-
-        # Se já existe e ainda é válida, atualiza `last_active`
         if session and now - session["last_active"] < self.SESSION_TIMEOUT:
             session["last_active"] = now
             return session["session_id"]
 
-        # Caso contrário, cria nova sessão
         new_session_id = str(uuid.uuid4())
-        self.sessions[user_id] = {
+        self.sessions[thread_id] = {
             "session_id": new_session_id,
             "last_active": now,
         }
@@ -187,54 +202,103 @@ class ModuleDeskHelper(commands.Cog):
             )
 
         @app_commands.command(
-            name="session-clear", description="Limpa a sessão de um usuário"
+            name="session-clear", description="Limpa a sessão de um tópico"
         )
-        @app_commands.describe(user="Usuário cuja sessão será removida")
-        async def session_clear(self, interaction: Interaction, user: Member):
-            if user.id in self.cog.sessions:
-                del self.cog.sessions[user.id]
+        @app_commands.describe(thread="Tópico (thread) cuja sessão será removida")
+        async def session_clear(self, interaction: Interaction, thread: discord.Thread):
+            if thread.id in self.cog.sessions:
+                del self.cog.sessions[thread.id]
                 await interaction.response.send_message(
-                    f"✅ Sessão de {user.mention} foi removida.", ephemeral=True
+                    f"✅ Sessão do tópico `{thread.name}` removida.", ephemeral=True
                 )
             else:
                 await interaction.response.send_message(
-                    f"ℹ️ {user.mention} não possui uma sessão ativa.", ephemeral=True
+                    f"ℹ️ O tópico `{thread.name}` não possui sessão ativa.",
+                    ephemeral=True,
                 )
 
         @app_commands.command(
-            name="session-set", description="Define o ID da sessão para um usuário"
+            name="session-set", description="Define o ID da sessão para um tópico"
         )
-        @app_commands.describe(user="Usuário", session_id="Novo ID da sessão")
+        @app_commands.describe(thread="Tópico", session_id="Novo ID da sessão")
         async def session_set(
-            self, interaction: Interaction, user: Member, session_id: str
+            self, interaction: Interaction, thread: discord.Thread, session_id: str
         ):
             now = datetime.utcnow()
-            self.cog.sessions[user.id] = {
+            self.cog.sessions[thread.id] = {
                 "session_id": session_id,
                 "last_active": now,
             }
             await interaction.response.send_message(
-                f"✅ Sessão de {user.mention} definida como `{session_id}`.",
+                f"✅ Sessão do tópico `{thread.name}` definida como `{session_id}`.",
                 ephemeral=True,
             )
 
         @app_commands.command(
-            name="session-get", description="Consulta o ID da sessão de um usuário"
+            name="session-get", description="Consulta o ID da sessão de um tópico"
         )
-        @app_commands.describe(user="Usuário")
-        async def session_get(self, interaction: Interaction, user: Member):
-            session = self.cog.sessions.get(user.id)
+        @app_commands.describe(thread="Tópico")
+        async def session_get(self, interaction: Interaction, thread: discord.Thread):
+            session = self.cog.sessions.get(thread.id)
             if session:
                 sid = session["session_id"]
                 last = session["last_active"].isoformat()
                 await interaction.response.send_message(
-                    f"ℹ️ Sessão de {user.mention}: `{sid}` (último uso: {last})",
+                    f"ℹ️ Sessão de `{thread.name}`: `{sid}` (último uso: {last})",
                     ephemeral=True,
                 )
             else:
                 await interaction.response.send_message(
-                    f"ℹ️ {user.mention} não possui uma sessão ativa.", ephemeral=True
+                    f"ℹ️ O tópico `{thread.name}` não possui uma sessão ativa.",
+                    ephemeral=True,
                 )
+
+        @app_commands.command(
+            name="session-copy",
+            description="Cria um novo tópico e copia a sessão de outro tópico",
+        )
+        @app_commands.describe(thread="Tópico cuja sessão será copiada")
+        async def session_copy(self, interaction: Interaction, thread: discord.Thread):
+            source_session = self.cog.sessions.get(thread.id)
+            if not source_session:
+                await interaction.response.send_message(
+                    f"❌ O tópico `{thread.name}` não possui uma sessão ativa.",
+                    ephemeral=True,
+                )
+                return
+
+            # Cria novo thread a partir da mensagem mais recente do canal (idealmente)
+            parent_channel = interaction.channel
+            if not isinstance(
+                parent_channel, (discord.TextChannel, discord.ForumChannel)
+            ):
+                await interaction.response.send_message(
+                    "❌ Este comando só pode ser usado em canais de texto ou fórum.",
+                    ephemeral=True,
+                )
+                return
+
+            # Nome para o novo tópico
+            new_thread_name = f"{thread.name}-cópia"
+
+            # Cria o novo thread
+            new_thread = await parent_channel.create_thread(
+                name=new_thread_name,
+                type=discord.ChannelType.public_thread,
+                auto_archive_duration=60,  # 1h
+                reason="Cópia de sessão com /deskhelper session-copy",
+            )
+
+            # Copia a sessão
+            self.cog.sessions[new_thread.id] = {
+                "session_id": source_session["session_id"],
+                "last_active": datetime.utcnow(),
+            }
+
+            await interaction.response.send_message(
+                f"✅ Sessão copiada de `{thread.name}` para o novo tópico: {new_thread.mention}",
+                ephemeral=True,
+            )
 
         @app_commands.command(
             name="session-list", description="Lista todas as sessões ativas"
@@ -247,10 +311,10 @@ class ModuleDeskHelper(commands.Cog):
                 return
 
             lines = []
-            for uid, sess in self.cog.sessions.items():
-                member = interaction.guild.get_member(uid)
-                mention = member.mention if member else f"`{uid}`"
-                lines.append(f"- {mention}: `{sess['session_id']}`")
+            for thread_id, sess in self.cog.sessions.items():
+                thread = interaction.guild.get_thread(thread_id)
+                name = thread.name if thread else f"`{thread_id}`"
+                lines.append(f"- {name}: `{sess['session_id']}`")
 
             await interaction.response.send_message(
                 "📋 Sessões ativas:\n" + "\n".join(lines), ephemeral=True
