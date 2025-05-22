@@ -68,9 +68,7 @@ class ModuleJoinToCreate(commands.Cog):
 
             # Cria o canal com as mesmas permissões
             new_channel = await member.guild.create_voice_channel(
-                name=channel_name,
-                category=category,
-                overwrites=overwrites
+                name=channel_name, category=category, overwrites=overwrites
             )
 
             self.temporary_channels.add(new_channel.id)

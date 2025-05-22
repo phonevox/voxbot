@@ -65,7 +65,9 @@ class ModuleDeskHelper(commands.Cog):
         logger.info("Carregando sessões...")
         logger.trace(f"BOT GUILDS: {self.bot.guilds}")
         for guild in self.bot.guilds:
-            logger.trace(f"Carregando sessões para o servidor {guild.name} ({guild.id})...")
+            logger.trace(
+                f"Carregando sessões para o servidor {guild.name} ({guild.id})..."
+            )
             data = self.gdm.for_guild(guild.id)
             saved_sessions = data.get("THREAD_SESSIONS") or {}
             logger.trace(f"Sessões salvas: {saved_sessions}")
@@ -83,9 +85,13 @@ class ModuleDeskHelper(commands.Cog):
                             thread = await self.bot.fetch_channel(thread_id)
                             if isinstance(thread, discord.Thread):
                                 await thread.delete(reason="Sessão de chatbot expirada")
-                                logger.info(f"Thread expirada deletada: {thread.name} ({thread_id})")
+                                logger.info(
+                                    f"Thread expirada deletada: {thread.name} ({thread_id})"
+                                )
                         except discord.NotFound:
-                            logger.warning(f"Thread não encontrada ao tentar deletar: {thread_id}")
+                            logger.warning(
+                                f"Thread não encontrada ao tentar deletar: {thread_id}"
+                            )
                         except Exception as e:
                             logger.error(f"Erro ao deletar thread {thread_id}: {e}")
                         continue  # não mantém a sessão
@@ -101,7 +107,9 @@ class ModuleDeskHelper(commands.Cog):
                     }
 
                 except Exception as e:
-                    logger.warning(f"Erro ao carregar sessão de thread {thread_id_str}: {e}")
+                    logger.warning(
+                        f"Erro ao carregar sessão de thread {thread_id_str}: {e}"
+                    )
 
             # Salva apenas sessões ainda válidas
             self.gdm.set(guild.id, "THREAD_SESSIONS", updated_sessions)
@@ -128,7 +136,11 @@ class ModuleDeskHelper(commands.Cog):
             user_input = message.content.strip()
             if not user_input:
                 return
-            response = await self.query_chatbot(session_id, user_input, with_execution_link=self.is_debug_mode(message.guild.id))
+            response = await self.query_chatbot(
+                session_id,
+                user_input,
+                with_execution_link=self.is_debug_mode(message.guild.id),
+            )
             await message.channel.send(response, reference=message)
             return
 
@@ -143,7 +155,7 @@ class ModuleDeskHelper(commands.Cog):
             if any(raw_content.startswith(m) for m in bot_mentions):
                 for mention in bot_mentions:
                     if raw_content.startswith(mention):
-                        user_input = raw_content[len(mention):].strip()
+                        user_input = raw_content[len(mention) :].strip()
                         break
 
                 if not user_input:
@@ -156,7 +168,11 @@ class ModuleDeskHelper(commands.Cog):
 
                 session_id = self.get_or_create_session(thread.id)
 
-                response = await self.query_chatbot(session_id, user_input, with_execution_link=self.is_debug_mode(message.guild.id))
+                response = await self.query_chatbot(
+                    session_id,
+                    user_input,
+                    with_execution_link=self.is_debug_mode(message.guild.id),
+                )
                 await thread.send(response)
 
     # Functions
@@ -198,7 +214,9 @@ class ModuleDeskHelper(commands.Cog):
             return channel.guild.id
         return None
 
-    async def query_chatbot(self, session_id: str, user_input: str, with_execution_link: bool = False) -> str:
+    async def query_chatbot(
+        self, session_id: str, user_input: str, with_execution_link: bool = False
+    ) -> str:
         logger = self.__getLogger("query_chatbot")
         url = self.QUERY_CHATBOT_URL
         payload = {
@@ -275,15 +293,21 @@ class ModuleDeskHelper(commands.Cog):
                 return False
             return True
 
-        @app_commands.command(name="clear-sessions", description="Limpa todas as sessões")
+        @app_commands.command(
+            name="clear-sessions", description="Limpa todas as sessões"
+        )
         async def clear_sessions(self, interaction: Interaction):
             self.cog.sessions.clear()
             guild_id = interaction.guild_id
             if guild_id:
                 self.cog.gdm.set(guild_id, "THREAD_SESSIONS", {})
-            await interaction.response.send_message("✅ Todas as sessões foram limpas.", ephemeral=True)
+            await interaction.response.send_message(
+                "✅ Todas as sessões foram limpas.", ephemeral=True
+            )
 
-        @app_commands.command(name="session-clear", description="Limpa a sessão de um tópico")
+        @app_commands.command(
+            name="session-clear", description="Limpa a sessão de um tópico"
+        )
         @app_commands.describe(thread="Tópico (thread) cuja sessão será removida")
         async def session_clear(self, interaction: Interaction, thread: discord.Thread):
             removed = False
@@ -307,7 +331,8 @@ class ModuleDeskHelper(commands.Cog):
                 )
             else:
                 await interaction.response.send_message(
-                    f"ℹ️ O tópico `{thread.name}` não possui sessão ativa.", ephemeral=True
+                    f"ℹ️ O tópico `{thread.name}` não possui sessão ativa.",
+                    ephemeral=True,
                 )
 
         @app_commands.command(
@@ -393,7 +418,9 @@ class ModuleDeskHelper(commands.Cog):
                 ephemeral=True,
             )
 
-        @app_commands.command(name="session-list", description="Lista todas as sessões ativas")
+        @app_commands.command(
+            name="session-list", description="Lista todas as sessões ativas"
+        )
         async def session_list(self, interaction: Interaction):
             if not self.cog.sessions:
                 await interaction.response.send_message(
@@ -413,13 +440,17 @@ class ModuleDeskHelper(commands.Cog):
                     thread_mention = f"[Thread {thread_id} não encontrada]"
                     # name = "desconhecido"
 
-                lines.append(f"- {thread_mention} - `{sess['session_id']}` (<t:{timestamp}:R>)")
+                lines.append(
+                    f"- {thread_mention} - `{sess['session_id']}` (<t:{timestamp}:R>)"
+                )
 
             await interaction.response.send_message(
                 "📋 Sessões ativas:\n" + "\n".join(lines), ephemeral=True
             )
 
-        @app_commands.command(name="debug", description="Ativa o modo de depuração baseado em GDM")
+        @app_commands.command(
+            name="debug", description="Ativa o modo de depuração baseado em GDM"
+        )
         async def debug(self, interaction: Interaction):
             guild_id = interaction.guild.id
             current = self.cog.gdm.get(guild_id, "DEBUG_MODE") or False

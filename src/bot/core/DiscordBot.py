@@ -1,7 +1,7 @@
 import logging
 import os
-import time
 import sys
+import time
 from typing import Optional
 
 import discord
@@ -128,7 +128,9 @@ class DiscordBot(commands.Bot):  # Mudamos para herdar de commands.Bot
                             os.getenv("BREAK_ON_COG_LOAD_FAILURE", "false").lower()
                             == "true"  # noqa
                         ):
-                            logger.critical("BREAK_ON_COG_LOAD_FAILURE is enabled. Exiting...")
+                            logger.critical(
+                                "BREAK_ON_COG_LOAD_FAILURE is enabled. Exiting..."
+                            )
                             sys.exit(1)
 
         cogloader_elapsed_time = time.time() - cogloader_start_time
