@@ -220,7 +220,7 @@ class ModuleDeskHelper(commands.Cog):
         logger = self.__getLogger("query_chatbot")
         url = self.QUERY_CHATBOT_URL
         payload = {
-            "SessionId": session_id,
+            "sessionId": session_id,
             "chatInput": user_input,
         }
 
