@@ -1,3 +1,12 @@
+## [1.5.2](https://github.com/phonevox/voxbot/compare/v1.5.1...v1.5.2) (2025-05-22)
+
+
+### Bug Fixes
+
+* wrong body for chatbot query ([#31](https://github.com/phonevox/voxbot/issues/31)) ([cbbe76e](https://github.com/phonevox/voxbot/commit/cbbe76e210499131dc8bebd69a2d50ed4a7849d0))
+
+
+
 ## [1.5.1](https://github.com/phonevox/voxbot/compare/v1.5.0...v1.5.1) (2025-05-22)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * just a test ([#25](https://github.com/phonevox/voxbot/issues/25)) ([6ca6cb9](https://github.com/phonevox/voxbot/commit/6ca6cb96d58eb8a836564dc7d3ab888f0847dc7c))
-
-
-
-# [1.4.0](https://github.com/phonevox/voxbot/compare/v1.3.1...v1.4.0) (2025-05-16)
-
-
-### Features
-
-* jointocreate set-alias, remove-alias and list-aliases ([#24](https://github.com/phonevox/voxbot/issues/24)) ([7f346d3](https://github.com/phonevox/voxbot/commit/7f346d381579cafd798abe78705d6bee4efe3670))
 
 
 
