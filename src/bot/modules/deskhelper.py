@@ -22,6 +22,9 @@ class ModuleDeskHelper(commands.Cog):
         self.logger = logging.getLogger(f"bot.module.{self.module_name}")
 
         # chatbot stuff
+        self.user_cooldowns = {}
+        self.COOLDOWN_SECONDS = 3
+
         self.sessions = {}
         self.SESSION_TIMEOUT = timedelta(minutes=15)
         self.QUERY_CHATBOT_URL = os.getenv("MOD_DESKHELPER_QUERYCHATBOT_URL")
@@ -55,13 +58,23 @@ class ModuleDeskHelper(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
+        now = datetime.utcnow()
+        user_id = message.author.id
+
+        # Debounce global por usuário
+        last_used = self.user_cooldowns.get(user_id)
+        if last_used and (now - last_used).total_seconds() < self.COOLDOWN_SECONDS:
+            return  # Está em cooldown
+
+        self.user_cooldowns[user_id] = now  # Atualiza o timestamp
+
         # Caso 1: Está em thread com sessão ativa
         if isinstance(message.channel, discord.Thread):
             thread_id = message.channel.id
             session = self.sessions.get(thread_id)
 
             if session:
-                session["last_active"] = datetime.utcnow()
+                session["last_active"] = now
                 user_input = message.content.strip()
                 if not user_input:
                     return
@@ -81,7 +94,7 @@ class ModuleDeskHelper(commands.Cog):
             if any(raw_content.startswith(m) for m in bot_mentions):
                 for mention in bot_mentions:
                     if raw_content.startswith(mention):
-                        user_input = raw_content[len(mention) :].strip()
+                        user_input = raw_content[len(mention):].strip()
                         break
 
                 if not user_input:
@@ -96,7 +109,7 @@ class ModuleDeskHelper(commands.Cog):
                 thread_id = thread.id
                 self.sessions[thread_id] = {
                     "session_id": str(uuid.uuid4()),
-                    "last_active": datetime.utcnow(),
+                    "last_active": now,
                 }
 
                 response = await self.query_chatbot(
