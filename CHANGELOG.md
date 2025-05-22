@@ -1,3 +1,12 @@
+## [1.5.1](https://github.com/phonevox/voxbot/compare/v1.5.0...v1.5.1) (2025-05-22)
+
+
+### Reverts
+
+* Revert "Feat/deskhelper threading sessions (#28)" (#29) ([0a8084c](https://github.com/phonevox/voxbot/commit/0a8084c7e21d409a1818acf1be02b20802298b81)), closes [#28](https://github.com/phonevox/voxbot/issues/28) [#29](https://github.com/phonevox/voxbot/issues/29)
+
+
+
 # [1.5.0](https://github.com/phonevox/voxbot/compare/v1.4.2...v1.5.0) (2025-05-20)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * jointocreate set-alias, remove-alias and list-aliases ([#24](https://github.com/phonevox/voxbot/issues/24)) ([7f346d3](https://github.com/phonevox/voxbot/commit/7f346d381579cafd798abe78705d6bee4efe3670))
-
-
-
-## [1.3.1](https://github.com/phonevox/voxbot/compare/v1.3.0...v1.3.1) (2025-05-15)
-
-
-### Bug Fixes
-
-* remove sync part from deploy workflow ([#23](https://github.com/phonevox/voxbot/issues/23)) ([800f071](https://github.com/phonevox/voxbot/commit/800f07152ec97a417430fd3fad0ad5f7ff1c9331))
 
 
 
