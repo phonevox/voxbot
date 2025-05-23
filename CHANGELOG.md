@@ -1,3 +1,12 @@
+## [1.5.3](https://github.com/phonevox/voxbot/compare/v1.5.2...v1.5.3) (2025-05-23)
+
+
+### Bug Fixes
+
+* chatbot answering unsessioned threads ([#32](https://github.com/phonevox/voxbot/issues/32)) ([9a1bc0c](https://github.com/phonevox/voxbot/commit/9a1bc0cf2c01e8470bbd4f00816b49e89ecc9775))
+
+
+
 ## [1.5.2](https://github.com/phonevox/voxbot/compare/v1.5.1...v1.5.2) (2025-05-22)
 
 
@@ -31,15 +40,6 @@
 ### Reverts
 
 * Revert "fix: just a test (#25)" (#26) ([d957b20](https://github.com/phonevox/voxbot/commit/d957b204bc55eaaae80530505e6123a6671d5848)), closes [#25](https://github.com/phonevox/voxbot/issues/25) [#26](https://github.com/phonevox/voxbot/issues/26)
-
-
-
-## [1.4.1](https://github.com/phonevox/voxbot/compare/v1.4.0...v1.4.1) (2025-05-16)
-
-
-### Bug Fixes
-
-* just a test ([#25](https://github.com/phonevox/voxbot/issues/25)) ([6ca6cb9](https://github.com/phonevox/voxbot/commit/6ca6cb96d58eb8a836564dc7d3ab888f0847dc7c))
 
 
 
