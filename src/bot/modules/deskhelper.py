@@ -63,7 +63,6 @@ class ModuleDeskHelper(commands.Cog):
     async def on_ready(self):
         logger = self.__getLogger("load_sessions")
         logger.info("Carregando sessões...")
-        logger.trace(f"BOT GUILDS: {self.bot.guilds}")
         for guild in self.bot.guilds:
             logger.trace(
                 f"Carregando sessões para o servidor {guild.name} ({guild.id})..."
@@ -116,6 +115,7 @@ class ModuleDeskHelper(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
+        logger = self.__getLogger("on_message")
         if message.author.bot or not message.guild:
             return
 
@@ -131,6 +131,13 @@ class ModuleDeskHelper(commands.Cog):
 
         if isinstance(message.channel, discord.Thread):
             thread_id = message.channel.id
+
+            if str(thread_id) not in self.gdm.get(
+                message.guild.id, "THREAD_SESSIONS", {}
+            ):
+                logger.warning("Message sent in a non-monitored thread!")
+                return
+
             session_id = self.get_or_create_session(thread_id)
 
             user_input = message.content.strip()
