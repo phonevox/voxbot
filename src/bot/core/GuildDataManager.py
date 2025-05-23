@@ -26,7 +26,7 @@ class GuildDataManager:
                 self.cache[gid] = doc
         self.logger.trace(f"Loaded {len(self.cache)} guilds into cache.")
 
-    def get(self, guild_id: int, key: str):
+    def get(self, guild_id: int, key: str, fallback: typing.Any = None):
         """Get a value for a specific guild and key."""
         if guild_id not in self.cache:
             self.cache[guild_id] = {}
@@ -36,7 +36,7 @@ class GuildDataManager:
 
         result = self.db.find_one({"GUILD_ID": guild_id}, {key: 1, "_id": 0})
         if not result or key not in result:
-            return None
+            return fallback
 
         self.cache[guild_id][key] = result[key]
         return result[key]
