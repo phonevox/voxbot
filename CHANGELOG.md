@@ -1,3 +1,12 @@
+# [1.6.0](https://github.com/phonevox/voxbot/compare/v1.5.3...v1.6.0) (2025-06-24)
+
+
+### Features
+
+* dynamic reloader, jtc user-specific overwrites ([#33](https://github.com/phonevox/voxbot/issues/33)) ([d4fcd5d](https://github.com/phonevox/voxbot/commit/d4fcd5dbbc9a64e425367912c85875df14fa845c))
+
+
+
 ## [1.5.3](https://github.com/phonevox/voxbot/compare/v1.5.2...v1.5.3) (2025-05-23)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * deskhelper chatbot module ([#27](https://github.com/phonevox/voxbot/issues/27)) ([3a94e8a](https://github.com/phonevox/voxbot/commit/3a94e8a4b801a1768c40d1bb506473a3e86d5048))
-
-
-
-## [1.4.2](https://github.com/phonevox/voxbot/compare/v1.4.1...v1.4.2) (2025-05-16)
-
-
-### Reverts
-
-* Revert "fix: just a test (#25)" (#26) ([d957b20](https://github.com/phonevox/voxbot/commit/d957b204bc55eaaae80530505e6123a6671d5848)), closes [#25](https://github.com/phonevox/voxbot/issues/25) [#26](https://github.com/phonevox/voxbot/issues/26)
 
 
 
