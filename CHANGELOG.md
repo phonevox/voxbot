@@ -1,3 +1,12 @@
+## [1.6.1](https://github.com/phonevox/voxbot/compare/v1.6.0...v1.6.1) (2025-06-24)
+
+
+### Bug Fixes
+
+* inverted permission check on dynamic reloader ([#34](https://github.com/phonevox/voxbot/issues/34)) ([a518ab2](https://github.com/phonevox/voxbot/commit/a518ab26083bed5fb7ddcdb2ec27bafed7bb1af4))
+
+
+
 # [1.6.0](https://github.com/phonevox/voxbot/compare/v1.5.3...v1.6.0) (2025-06-24)
 
 
@@ -31,15 +40,6 @@
 ### Reverts
 
 * Revert "Feat/deskhelper threading sessions (#28)" (#29) ([0a8084c](https://github.com/phonevox/voxbot/commit/0a8084c7e21d409a1818acf1be02b20802298b81)), closes [#28](https://github.com/phonevox/voxbot/issues/28) [#29](https://github.com/phonevox/voxbot/issues/29)
-
-
-
-# [1.5.0](https://github.com/phonevox/voxbot/compare/v1.4.2...v1.5.0) (2025-05-20)
-
-
-### Features
-
-* deskhelper chatbot module ([#27](https://github.com/phonevox/voxbot/issues/27)) ([3a94e8a](https://github.com/phonevox/voxbot/commit/3a94e8a4b801a1768c40d1bb506473a3e86d5048))
 
 
 
