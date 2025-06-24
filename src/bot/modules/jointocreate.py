@@ -64,9 +64,20 @@ class ModuleJoinToCreate(commands.Cog):
             channel_name = alias or f"Sala de {member_display_name}"
 
             # Copia as permissões do canal original
-            overwrites = after.channel.overwrites
+            overwrites = after.channel.overwrites.copy()
 
-            # Cria o canal com as mesmas permissões
+            # Overwrites personalizados apenas para o dono do canal
+            user_overwrites = discord.PermissionOverwrite(
+                manage_channels=True,  # Gerenciar canal (renomear, excluir, etc.)
+                mute_members=True,  # Silenciar membros
+                deafen_members=True,  # Ensurdecer membros
+                move_members=True,  # Mover membros
+            )
+
+            # Aplica ao usuário dono do canal
+            overwrites[member] = user_overwrites
+
+            # Cria o canal com os overwrites ajustados
             new_channel = await member.guild.create_voice_channel(
                 name=channel_name, category=category, overwrites=overwrites
             )
