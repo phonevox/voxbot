@@ -72,6 +72,7 @@ class ModuleJoinToCreate(commands.Cog):
                 mute_members=True,  # Silenciar membros
                 deafen_members=True,  # Ensurdecer membros
                 move_members=True,  # Mover membros
+                # cant add overwrite for channel status cause discord.py didnt update that yet!!!!! 24-06-2025
             )
 
             # Aplica ao usuário dono do canal

@@ -31,12 +31,7 @@ class ModuleDynamicModuleReloader(commands.Cog):
             self.cog = cog
 
         async def interaction_check(self, interaction: Interaction) -> bool:
-            if interaction.user.id in AUTHORIZED_USERS_ID:
-                await interaction.response.send_message(
-                    "❌ Você não tem permissão para usar esse comando.", ephemeral=True
-                )
-                return False
-            return True
+            return interaction.user.id in AUTHORIZED_USERS_ID
 
         @app_commands.command(
             name="load", description="Carregar uma cog pelo seu nome (último segmento)"
