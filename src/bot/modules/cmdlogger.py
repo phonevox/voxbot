@@ -49,9 +49,14 @@ class CommandLogger(commands.Cog):
                     if hasattr(interaction, "namespace")
                     else {}
                 )
+
+                args_str = " ".join(f"{k}:{v}" for k, v in args.items()) if args else ""
+                full_command_str = f"/{command_name} {args_str}".strip()
+
                 logger.command(
-                    f"'{interaction.user}' executed '/{command_name}' with args: {args} in server '{interaction.guild}'"
+                    f"'{interaction.user}' executed '{full_command_str}' in server '{interaction.guild}'"
                 )
+
         except Exception as e:
             logger.error(f"Error logging interaction: {e}")
 
