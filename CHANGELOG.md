@@ -1,3 +1,12 @@
+# [1.7.0](https://github.com/phonevox/voxbot/compare/v1.6.1...v1.7.0) (2025-07-07)
+
+
+### Features
+
+* issabel report parser and autoblocker refresh command ([#35](https://github.com/phonevox/voxbot/issues/35)) ([c70c197](https://github.com/phonevox/voxbot/commit/c70c19798eaf0d12a388667ac47ef323e033e7d2))
+
+
+
 ## [1.6.1](https://github.com/phonevox/voxbot/compare/v1.6.0...v1.6.1) (2025-06-24)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * wrong body for chatbot query ([#31](https://github.com/phonevox/voxbot/issues/31)) ([cbbe76e](https://github.com/phonevox/voxbot/commit/cbbe76e210499131dc8bebd69a2d50ed4a7849d0))
-
-
-
-## [1.5.1](https://github.com/phonevox/voxbot/compare/v1.5.0...v1.5.1) (2025-05-22)
-
-
-### Reverts
-
-* Revert "Feat/deskhelper threading sessions (#28)" (#29) ([0a8084c](https://github.com/phonevox/voxbot/commit/0a8084c7e21d409a1818acf1be02b20802298b81)), closes [#28](https://github.com/phonevox/voxbot/issues/28) [#29](https://github.com/phonevox/voxbot/issues/29)
 
 
 
