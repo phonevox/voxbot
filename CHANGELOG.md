@@ -1,3 +1,12 @@
+## [1.8.2](https://github.com/phonevox/voxbot/compare/v1.8.1...v1.8.2) (2025-07-18)
+
+
+### Bug Fixes
+
+* missing module ([68cfa1a](https://github.com/phonevox/voxbot/commit/68cfa1a67ffab7c7d324ce81681f26d90c695cfd))
+
+
+
 ## [1.8.1](https://github.com/phonevox/voxbot/compare/v1.8.0...v1.8.1) (2025-07-18)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * inverted permission check on dynamic reloader ([#34](https://github.com/phonevox/voxbot/issues/34)) ([a518ab2](https://github.com/phonevox/voxbot/commit/a518ab26083bed5fb7ddcdb2ec27bafed7bb1af4))
-
-
-
-# [1.6.0](https://github.com/phonevox/voxbot/compare/v1.5.3...v1.6.0) (2025-06-24)
-
-
-### Features
-
-* dynamic reloader, jtc user-specific overwrites ([#33](https://github.com/phonevox/voxbot/issues/33)) ([d4fcd5d](https://github.com/phonevox/voxbot/commit/d4fcd5dbbc9a64e425367912c85875df14fa845c))
 
 
 
