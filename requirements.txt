@@ -4,3 +4,4 @@ aiohttp
 motor
 colorlog
 emoji
+requests
