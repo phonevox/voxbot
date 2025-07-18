@@ -1,14 +1,15 @@
-import discord
-from discord.ext import commands
-from discord import app_commands
 import logging
-import requests
-from io import BytesIO
-import shutil
-from pydub import AudioSegment
-import re
-import unicodedata
 import os
+import re
+import shutil
+import unicodedata
+from io import BytesIO
+
+import discord
+import requests
+from discord import app_commands
+from discord.ext import commands
+from pydub import AudioSegment
 
 
 def normalize_audio_name(text: str, word_limit: int = 4) -> str:
@@ -40,7 +41,9 @@ class TTSCog(commands.Cog):
         self.api_token = os.getenv("MOD_TTS_TOKEN")
 
         if not self.FFMPEG_AVAILABLE:
-            self.logger.warning("FFmpeg não está disponível. A conversão do TTS não funcionará.")
+            self.logger.warning(
+                "FFmpeg não está disponível. A conversão do TTS não funcionará."
+            )
         else:
             self.logger.debug("FFmpeg está disponível.")
 
@@ -74,21 +77,24 @@ class TTSCog(commands.Cog):
 
             # requisitando o áudio
             url = self.api_url
-            headers = {
-                "Authorization": f"Bearer {self.api_token}"
-            }
+            headers = {"Authorization": f"Bearer {self.api_token}"}
             payload = {"text": texto}
 
             response = requests.post(url, headers=headers, json=payload)
 
             if response.status_code != 200 or not response.content:
-                return await interaction.followup.send(embed=error_embed("Erro ao gerar o áudio."), ephemeral=ephemeral)
+                return await interaction.followup.send(
+                    embed=error_embed("Erro ao gerar o áudio."), ephemeral=ephemeral
+                )
 
             content_type = response.headers.get("Content-Type", "")
             if "application/json" in content_type:
                 data = response.json()
                 logger.warning(f"Resposta inesperada da API: {data}")
-                return await interaction.followup.send(embed=error_embed("Resposta inválida da API de TTS."), ephemeral=ephemeral)
+                return await interaction.followup.send(
+                    embed=error_embed("Resposta inválida da API de TTS."),
+                    ephemeral=ephemeral,
+                )
 
             audio_bytes = BytesIO(response.content)
 
@@ -96,7 +102,9 @@ class TTSCog(commands.Cog):
             if converter:
                 if not self.FFMPEG_AVAILABLE:
                     return await interaction.followup.send(
-                        embed=error_embed("⚠️ O sistema não consegue converter áudios atualmente.\nPara mais informações, consulte o log.")
+                        embed=error_embed(
+                            "⚠️ O sistema não consegue converter áudios atualmente.\nPara mais informações, consulte o log."
+                        )
                     )
 
                 audio = AudioSegment.from_file(audio_bytes, format="mp3")
@@ -123,14 +131,19 @@ class TTSCog(commands.Cog):
 
             # Verificação final de tamanho
             if final_file.getbuffer().nbytes > 10 * 1024 * 1024:
-                return await interaction.followup.send(embed=error_embed("O áudio gerado é muito grande (10MB+)."), ephemeral=ephemeral)
+                return await interaction.followup.send(
+                    embed=error_embed("O áudio gerado é muito grande (10MB+)."),
+                    ephemeral=ephemeral,
+                )
 
             file = discord.File(final_file, filename=filename)
             await interaction.followup.send(file=file, ephemeral=ephemeral)
 
         except Exception as e:
             logger.error("Erro ao gerar TTS", exc_info=e)
-            await interaction.followup.send(embed=error_embed("Algo deu errado 🥲"), ephemeral=ephemeral)
+            await interaction.followup.send(
+                embed=error_embed("Algo deu errado 🥲"), ephemeral=ephemeral
+            )
 
 
 async def setup(bot: commands.Bot):
