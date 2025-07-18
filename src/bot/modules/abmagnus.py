@@ -46,7 +46,9 @@ class AbmagnusModule(commands.Cog):
             self.cog = cog
 
         async def interaction_check(self, interaction: Interaction) -> bool:
-            return interaction.user.id in AUTHORIZED_USERS_ID
+            return interaction.user.id in AUTHORIZED_USERS_ID or any(
+                role.id in AUTHORIZED_ROLES_ID for role in interaction.user.roles
+            )
 
         @app_commands.command(
             name="atualizar", description="Forçar atualização do Auto-Bloqueador."
