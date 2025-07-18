@@ -1,3 +1,12 @@
+## [1.8.1](https://github.com/phonevox/voxbot/compare/v1.8.0...v1.8.1) (2025-07-18)
+
+
+### Bug Fixes
+
+* missing module ([91341d6](https://github.com/phonevox/voxbot/commit/91341d65dbc062eaf8540e04cd4edc160f01355b))
+
+
+
 # [1.8.0](https://github.com/phonevox/voxbot/compare/v1.7.0...v1.8.0) (2025-07-18)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * dynamic reloader, jtc user-specific overwrites ([#33](https://github.com/phonevox/voxbot/issues/33)) ([d4fcd5d](https://github.com/phonevox/voxbot/commit/d4fcd5dbbc9a64e425367912c85875df14fa845c))
-
-
-
-## [1.5.3](https://github.com/phonevox/voxbot/compare/v1.5.2...v1.5.3) (2025-05-23)
-
-
-### Bug Fixes
-
-* chatbot answering unsessioned threads ([#32](https://github.com/phonevox/voxbot/issues/32)) ([9a1bc0c](https://github.com/phonevox/voxbot/commit/9a1bc0cf2c01e8470bbd4f00816b49e89ecc9775))
 
 
 
