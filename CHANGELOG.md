@@ -1,3 +1,12 @@
+## [1.8.3](https://github.com/phonevox/voxbot/compare/v1.8.2...v1.8.3) (2025-07-18)
+
+
+### Bug Fixes
+
+* invalid argument ([c4285b3](https://github.com/phonevox/voxbot/commit/c4285b34aaaa27510295d7155460b46d7743251b))
+
+
+
 ## [1.8.2](https://github.com/phonevox/voxbot/compare/v1.8.1...v1.8.2) (2025-07-18)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * issabel report parser and autoblocker refresh command ([#35](https://github.com/phonevox/voxbot/issues/35)) ([c70c197](https://github.com/phonevox/voxbot/commit/c70c19798eaf0d12a388667ac47ef323e033e7d2))
-
-
-
-## [1.6.1](https://github.com/phonevox/voxbot/compare/v1.6.0...v1.6.1) (2025-06-24)
-
-
-### Bug Fixes
-
-* inverted permission check on dynamic reloader ([#34](https://github.com/phonevox/voxbot/issues/34)) ([a518ab2](https://github.com/phonevox/voxbot/commit/a518ab26083bed5fb7ddcdb2ec27bafed7bb1af4))
 
 
 
