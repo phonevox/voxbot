@@ -58,7 +58,7 @@ class TTSCog(commands.Cog):
     async def tts(
         self,
         interaction: discord.Interaction,
-        text: str,
+        texto: str,
         output: str = None,
         ephemeral: bool = False,
         converter: bool = False,
@@ -78,7 +78,7 @@ class TTSCog(commands.Cog):
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
             }
-            payload = {"text": text}
+            payload = {"text": texto}
 
             response = requests.post(url, headers=headers, json=payload)
 
