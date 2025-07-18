@@ -1,3 +1,12 @@
+## [1.8.4](https://github.com/phonevox/voxbot/compare/v1.8.3...v1.8.4) (2025-07-18)
+
+
+### Bug Fixes
+
+* normalize typo ([1531143](https://github.com/phonevox/voxbot/commit/15311438e06f9bafc939c39d646d04c13f35ce2a))
+
+
+
 ## [1.8.3](https://github.com/phonevox/voxbot/compare/v1.8.2...v1.8.3) (2025-07-18)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * tts module, docker system packages ([e8d0c0b](https://github.com/phonevox/voxbot/commit/e8d0c0b838fed229fd2c1184485d14e1a1902189))
-
-
-
-# [1.7.0](https://github.com/phonevox/voxbot/compare/v1.6.1...v1.7.0) (2025-07-07)
-
-
-### Features
-
-* issabel report parser and autoblocker refresh command ([#35](https://github.com/phonevox/voxbot/issues/35)) ([c70c197](https://github.com/phonevox/voxbot/commit/c70c19798eaf0d12a388667ac47ef323e033e7d2))
 
 
 
