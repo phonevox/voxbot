@@ -125,7 +125,7 @@ class TTSCog(commands.Cog):
             if output_filename:
                 filename = f"{output_filename}.{file_extension}"
             else:
-                normalized_filename = normalize_audio_name(text)
+                normalized_filename = normalize_audio_name(texto)
                 if not normalized_filename:  # burro demais slk
                     normalized_filename = "unnamed-tts"
                 filename = f"{normalized_filename}.{file_extension}"
