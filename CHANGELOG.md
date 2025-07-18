@@ -1,3 +1,12 @@
+# [1.8.0](https://github.com/phonevox/voxbot/compare/v1.7.0...v1.8.0) (2025-07-18)
+
+
+### Features
+
+* tts module, docker system packages ([e8d0c0b](https://github.com/phonevox/voxbot/commit/e8d0c0b838fed229fd2c1184485d14e1a1902189))
+
+
+
 # [1.7.0](https://github.com/phonevox/voxbot/compare/v1.6.1...v1.7.0) (2025-07-07)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * chatbot answering unsessioned threads ([#32](https://github.com/phonevox/voxbot/issues/32)) ([9a1bc0c](https://github.com/phonevox/voxbot/commit/9a1bc0cf2c01e8470bbd4f00816b49e89ecc9775))
-
-
-
-## [1.5.2](https://github.com/phonevox/voxbot/compare/v1.5.1...v1.5.2) (2025-05-22)
-
-
-### Bug Fixes
-
-* wrong body for chatbot query ([#31](https://github.com/phonevox/voxbot/issues/31)) ([cbbe76e](https://github.com/phonevox/voxbot/commit/cbbe76e210499131dc8bebd69a2d50ed4a7849d0))
 
 
 
