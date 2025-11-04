@@ -1,3 +1,12 @@
+## [1.8.5](https://github.com/phonevox/voxbot/compare/v1.8.4...v1.8.5) (2025-11-04)
+
+
+### Bug Fixes
+
+* ab allowed users ([a54ff54](https://github.com/phonevox/voxbot/commit/a54ff54671fc5ab727c10beafabaf7612db6a3df))
+
+
+
 ## [1.8.4](https://github.com/phonevox/voxbot/compare/v1.8.3...v1.8.4) (2025-07-18)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * missing module ([91341d6](https://github.com/phonevox/voxbot/commit/91341d65dbc062eaf8540e04cd4edc160f01355b))
-
-
-
-# [1.8.0](https://github.com/phonevox/voxbot/compare/v1.7.0...v1.8.0) (2025-07-18)
-
-
-### Features
-
-* tts module, docker system packages ([e8d0c0b](https://github.com/phonevox/voxbot/commit/e8d0c0b838fed229fd2c1184485d14e1a1902189))
 
 
 
