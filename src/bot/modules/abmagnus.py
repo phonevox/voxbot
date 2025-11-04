@@ -8,13 +8,18 @@ from discord.ext import commands
 logger = logging.getLogger("bot.module.autobloqueador")
 
 AUTHORIZED_USERS_ID = [
-    188851299255713792,
-    968851062679302164,
-    1087873539635433522,
+    1356243257855705271,  # pedro
+    1083013666074546277,  # leonardo
+    660153918214504480,   # abner
+    968851062679302164,   # eu (trabalho)
+    188851299255713792,   # eu (pessoal)
+    1214929223572127874,  # andre
+    1087873539635433522,  # rafael
 ]
-AUTHORIZED_ROLES_ID = [
-    1087873539635433522,
-]
+
+# AUTHORIZED_ROLES_ID = [
+#     1087873539635433522,
+# ]
 
 
 class AbmagnusModule(commands.Cog):
