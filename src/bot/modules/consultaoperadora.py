@@ -58,7 +58,7 @@ class ConsultaOperadora(commands.Cog):
             if current_time - self._last_consulta < 30:
                 wait_time = 30 - (current_time - self._last_consulta)
                 await interaction.followup.send(
-                    f"⏳ Rate limit atingido. Aguarde {wait_time:.0f} segundos antes de usar novamente.",
+                    f"⏳ Aguarde {wait_time:.0f} segundos antes de usar novamente.",
                     ephemeral=True,
                 )
                 return
@@ -67,9 +67,12 @@ class ConsultaOperadora(commands.Cog):
         # Normaliza o número
         numero_norm = normalizar_numero(numero)
         if not numero_norm:
-            await interaction.followup.send(
-                "❌ Número inválido. Certifique-se de que é um número brasileiro válido (10 ou 11 dígitos).",
-                ephemeral=True,
+            await interaction.channel.send(
+                embed=discord.Embed(
+                    title="📞 Consulta de Operadora",
+                    description="❌ Número inválido. Certifique-se de que é um número brasileiro válido (10 ou 11 dígitos).",
+                    color=0xFF0000,  # Vermelho para erro
+                )
             )
             return
 
@@ -85,16 +88,22 @@ class ConsultaOperadora(commands.Cog):
             response = requests.post(url, data=data, headers=headers, timeout=5)
             response.raise_for_status()  # Levanta exceção para códigos de erro HTTP
         except requests.exceptions.Timeout:
-            await interaction.followup.send(
-                "❌ Timeout na requisição. Tente novamente em alguns segundos.",
-                ephemeral=True,
+            await interaction.channel.send(
+                embed=discord.Embed(
+                    title="📞 Consulta de Operadora",
+                    description=f"❌ A consulta para o número **{numero_norm}** excedeu o tempo limite. Tente novamente mais tarde.",
+                    color=0xFF0000,  # Vermelho para erro
+                )
             )
             return
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Erro na requisição: {e}")
-            await interaction.followup.send(
-                "❌ Erro ao conectar com o serviço de consulta. Tente novamente mais tarde.",
-                ephemeral=True,
+            await interaction.channel.send(
+                embed=discord.Embed(
+                    title="📞 Consulta de Operadora",
+                    description=f"❌ Ocorreu um erro ao consultar o número **{numero_norm}**. Tente novamente mais tarde.",
+                    color=0xFF0000,  # Vermelho para erro
+                )
             )
             return
 
@@ -112,8 +121,12 @@ class ConsultaOperadora(commands.Cog):
 
         except Exception as e:
             self.logger.error(f"Erro ao parsear resposta: {e}")
-            await interaction.followup.send(
-                "❌ Erro ao processar a resposta do serviço.", ephemeral=True
+            await interaction.channel.send(
+                embed=discord.Embed(
+                    title="📞 Consulta de Operadora",
+                    description=f"❌ Não foi possível processar a resposta para o número **{numero_norm}**.",
+                    color=0xFF0000,  # Vermelho para erro
+                )
             )
             return
 
@@ -127,9 +140,12 @@ class ConsultaOperadora(commands.Cog):
         portado = portado_match.group(1).upper() == "SIM" if portado_match else None
 
         if not operadora:
-            await interaction.followup.send(
-                f"❌ Não foi possível encontrar informações para o número **{numero_norm}**. Pode ser um número inválido ou sem dados disponíveis.",
-                ephemeral=True,
+            await interaction.channel.send(
+                embed=discord.Embed(
+                    title="📞 Consulta de Operadora",
+                    description=f"❌ Não foi possível encontrar informações para o número **{numero_norm}**. Pode ser um número inválido ou sem dados disponíveis.",
+                    color=0xFF0000,  # Vermelho para erro
+                )
             )
             return
 
@@ -139,16 +155,13 @@ class ConsultaOperadora(commands.Cog):
             if portado is True
             else "Não" if portado is False else "Não disponível"
         )
-        embed = discord.Embed(
-            title="📞 Consulta de Operadora",
-            color=0x00ff00  # Verde para sucesso
-        )
+        embed = discord.Embed(title="📞 Consulta de Operadora", color=0x00FF00)
         embed.add_field(name="Número", value=f"`{numero_norm}`", inline=True)
         embed.add_field(name="Portado", value=f"`{portado_str}`", inline=True)
         embed.add_field(name="Operadora", value=f"`{operadora}`", inline=False)
         embed.set_footer(text="Dados consultados via API externa")
 
-        await interaction.followup.send(embed=embed, ephemeral=False)
+        await interaction.channel.send(embed=embed, ephemeral=False)
 
 
 async def setup(bot: commands.Bot):
