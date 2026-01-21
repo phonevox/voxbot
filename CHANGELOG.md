@@ -1,3 +1,12 @@
+## [1.9.3](https://github.com/phonevox/voxbot/compare/v1.9.2...v1.9.3) (2026-01-21)
+
+
+### Bug Fixes
+
+* consultaoperadora public defer ([3c86f41](https://github.com/phonevox/voxbot/commit/3c86f411afea003aaab34b3a46c410a2898d914e))
+
+
+
 ## [1.9.2](https://github.com/phonevox/voxbot/compare/v1.9.1...v1.9.2) (2026-01-21)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * ab allowed users ([a54ff54](https://github.com/phonevox/voxbot/commit/a54ff54671fc5ab727c10beafabaf7612db6a3df))
-
-
-
-## [1.8.4](https://github.com/phonevox/voxbot/compare/v1.8.3...v1.8.4) (2025-07-18)
-
-
-### Bug Fixes
-
-* normalize typo ([1531143](https://github.com/phonevox/voxbot/commit/15311438e06f9bafc939c39d646d04c13f35ce2a))
 
 
 
