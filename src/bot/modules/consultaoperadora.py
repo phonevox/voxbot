@@ -50,7 +50,7 @@ class ConsultaOperadora(commands.Cog):
     )
     @app_commands.describe(numero="Número de telefone para consultar (ex: 11999999999)")
     async def consultaoperadora(self, interaction: discord.Interaction, numero: str):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=False)
 
         # Rate limit global: 1 requisição a cada 30 segundos
         async with self._lock:
@@ -67,7 +67,7 @@ class ConsultaOperadora(commands.Cog):
         # Normaliza o número
         numero_norm = normalizar_numero(numero)
         if not numero_norm:
-            await interaction.channel.send(
+            await interaction.followup.send(
                 embed=discord.Embed(
                     title="📞 Consulta de Operadora",
                     description="❌ Número inválido. Certifique-se de que é um número brasileiro válido (10 ou 11 dígitos).",
@@ -88,7 +88,7 @@ class ConsultaOperadora(commands.Cog):
             response = requests.post(url, data=data, headers=headers, timeout=5)
             response.raise_for_status()  # Levanta exceção para códigos de erro HTTP
         except requests.exceptions.Timeout:
-            await interaction.channel.send(
+            await interaction.followup.send(
                 embed=discord.Embed(
                     title="📞 Consulta de Operadora",
                     description=f"❌ A consulta para o número **{numero_norm}** excedeu o tempo limite. Tente novamente mais tarde.",
@@ -98,7 +98,7 @@ class ConsultaOperadora(commands.Cog):
             return
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Erro na requisição: {e}")
-            await interaction.channel.send(
+            await interaction.followup.send(
                 embed=discord.Embed(
                     title="📞 Consulta de Operadora",
                     description=f"❌ Ocorreu um erro ao consultar o número **{numero_norm}**. Tente novamente mais tarde.",
@@ -121,7 +121,7 @@ class ConsultaOperadora(commands.Cog):
 
         except Exception as e:
             self.logger.error(f"Erro ao parsear resposta: {e}")
-            await interaction.channel.send(
+            await interaction.followup.send(
                 embed=discord.Embed(
                     title="📞 Consulta de Operadora",
                     description=f"❌ Não foi possível processar a resposta para o número **{numero_norm}**.",
@@ -140,7 +140,7 @@ class ConsultaOperadora(commands.Cog):
         portado = portado_match.group(1).upper() == "SIM" if portado_match else None
 
         if not operadora:
-            await interaction.channel.send(
+            await interaction.followup.send(
                 embed=discord.Embed(
                     title="📞 Consulta de Operadora",
                     description=f"❌ Não foi possível encontrar informações para o número **{numero_norm}**. Pode ser um número inválido ou sem dados disponíveis.",
@@ -161,7 +161,7 @@ class ConsultaOperadora(commands.Cog):
         embed.add_field(name="Operadora", value=f"`{operadora}`", inline=False)
         embed.set_footer(text="Dados consultados via API externa")
 
-        await interaction.channel.send(embed=embed)
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):
