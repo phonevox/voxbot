@@ -10,9 +10,9 @@ logger = logging.getLogger("bot.module.autobloqueador")
 AUTHORIZED_USERS_ID = [
     1356243257855705271,  # pedro
     1083013666074546277,  # leonardo
-    660153918214504480,   # abner
-    968851062679302164,   # eu (trabalho)
-    188851299255713792,   # eu (pessoal)
+    660153918214504480,  # abner
+    968851062679302164,  # eu (trabalho)
+    188851299255713792,  # eu (pessoal)
     1214929223572127874,  # andre
     1087873539635433522,  # rafael
 ]
