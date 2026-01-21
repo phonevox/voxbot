@@ -1,3 +1,12 @@
+# [1.9.0](https://github.com/phonevox/voxbot/compare/v1.8.5...v1.9.0) (2026-01-21)
+
+
+### Features
+
+* consultaoperadora ([2732240](https://github.com/phonevox/voxbot/commit/273224079eca32258e762c4cfd5b5cb554e56a61))
+
+
+
 ## [1.8.5](https://github.com/phonevox/voxbot/compare/v1.8.4...v1.8.5) (2025-11-04)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * missing module ([68cfa1a](https://github.com/phonevox/voxbot/commit/68cfa1a67ffab7c7d324ce81681f26d90c695cfd))
-
-
-
-## [1.8.1](https://github.com/phonevox/voxbot/compare/v1.8.0...v1.8.1) (2025-07-18)
-
-
-### Bug Fixes
-
-* missing module ([91341d6](https://github.com/phonevox/voxbot/commit/91341d65dbc062eaf8540e04cd4edc160f01355b))
 
 
 
