@@ -161,7 +161,7 @@ class ConsultaOperadora(commands.Cog):
         embed.add_field(name="Operadora", value=f"`{operadora}`", inline=False)
         embed.set_footer(text="Dados consultados via API externa")
 
-        await interaction.channel.send(embed=embed, ephemeral=False)
+        await interaction.channel.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):
