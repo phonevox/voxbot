@@ -1,3 +1,12 @@
+## [1.9.1](https://github.com/phonevox/voxbot/compare/v1.9.0...v1.9.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* consultaoperadora answer on channel instead of followup ([fec793f](https://github.com/phonevox/voxbot/commit/fec793fa9e5f94f42d7e0cd050ba3614a8672887))
+
+
+
 # [1.9.0](https://github.com/phonevox/voxbot/compare/v1.8.5...v1.9.0) (2026-01-21)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * invalid argument ([c4285b3](https://github.com/phonevox/voxbot/commit/c4285b34aaaa27510295d7155460b46d7743251b))
-
-
-
-## [1.8.2](https://github.com/phonevox/voxbot/compare/v1.8.1...v1.8.2) (2025-07-18)
-
-
-### Bug Fixes
-
-* missing module ([68cfa1a](https://github.com/phonevox/voxbot/commit/68cfa1a67ffab7c7d324ce81681f26d90c695cfd))
 
 
 
