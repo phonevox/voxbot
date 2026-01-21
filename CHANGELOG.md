@@ -1,3 +1,12 @@
+## [1.9.2](https://github.com/phonevox/voxbot/compare/v1.9.1...v1.9.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* consultaoperadora module mistake ([61c2e72](https://github.com/phonevox/voxbot/commit/61c2e727c3b8da24f198fb7439899c8a0ec4b089))
+
+
+
 ## [1.9.1](https://github.com/phonevox/voxbot/compare/v1.9.0...v1.9.1) (2026-01-21)
 
 
@@ -31,15 +40,6 @@
 ### Bug Fixes
 
 * normalize typo ([1531143](https://github.com/phonevox/voxbot/commit/15311438e06f9bafc939c39d646d04c13f35ce2a))
-
-
-
-## [1.8.3](https://github.com/phonevox/voxbot/compare/v1.8.2...v1.8.3) (2025-07-18)
-
-
-### Bug Fixes
-
-* invalid argument ([c4285b3](https://github.com/phonevox/voxbot/commit/c4285b34aaaa27510295d7155460b46d7743251b))
 
 
 
