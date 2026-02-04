@@ -1,3 +1,12 @@
+## [1.9.4](https://github.com/phonevox/voxbot/compare/v1.9.3...v1.9.4) (2026-02-04)
+
+
+### Bug Fixes
+
+* deploy ssh port ([ec3b548](https://github.com/phonevox/voxbot/commit/ec3b5480aa6efc6e62de63f0bfdc853c2ad07950))
+
+
+
 ## [1.9.3](https://github.com/phonevox/voxbot/compare/v1.9.2...v1.9.3) (2026-01-21)
 
 
@@ -31,15 +40,6 @@
 ### Features
 
 * consultaoperadora ([2732240](https://github.com/phonevox/voxbot/commit/273224079eca32258e762c4cfd5b5cb554e56a61))
-
-
-
-## [1.8.5](https://github.com/phonevox/voxbot/compare/v1.8.4...v1.8.5) (2025-11-04)
-
-
-### Bug Fixes
-
-* ab allowed users ([a54ff54](https://github.com/phonevox/voxbot/commit/a54ff54671fc5ab727c10beafabaf7612db6a3df))
 
 
 
