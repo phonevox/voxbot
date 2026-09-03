@@ -7,9 +7,11 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      # Sobrescreve o POSTGRES_HOST do .env - dentro do compose o banco sempre está em "db"
-      # (nome do serviço abaixo), nunca em localhost.
+      # Sobrescreve o POSTGRES_HOST/PORT do .env - dentro do compose o banco sempre está em "db:5432"
+      # (nome do serviço, porta interna padrão do Postgres). Qualquer POSTGRES_PORT no .env é só o
+      # port scheme de host/proxy (Dokploy etc) - o container nunca escuta em outra porta.
       POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
     volumes:
       - ./logs:/app/logs
     # Publica a porta de ingest do Zabbix direto no host - sem proxy/túnel no meio. A segurança
