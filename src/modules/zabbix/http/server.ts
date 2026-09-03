@@ -18,16 +18,11 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Atrás de um túnel (cloudflared etc, ver `scripts/zabbix-tunnel.sh`) toda requisição chega no
- * `node:http` vinda de localhost - o IP de origem real vai em `X-Forwarded-For`. Só dá pra confiar
- * nesse header porque o servidor só escuta em loopback (ver `startIngestServer`): ninguém de fora
- * alcança essa porta direto pra forjar o header, só o processo do túnel local.
+ * Porta exposta direto (container publicado ou rede local) - sem proxy confiável na frente pra
+ * normalizar isso, então `X-Forwarded-For` NÃO é usado: um cliente qualquer pode setar esse header
+ * com qualquer valor e passar pelo allowlist de IP. O IP real é sempre o do socket TCP.
  */
 function extractClientIp(req: IncomingMessage): string | undefined {
-	const forwarded = req.headers["x-forwarded-for"];
-	if (typeof forwarded === "string" && forwarded.trim()) {
-		return forwarded.split(",")[0]?.trim();
-	}
 	return req.socket.remoteAddress;
 }
 
@@ -109,10 +104,10 @@ export function startIngestServer(client: Client): Server {
 		});
 	});
 
-	// Só loopback - o caminho de entrada é sempre um túnel/proxy local (ver
-	// scripts/zabbix-tunnel.sh), nunca a porta exposta direto pra rede/internet.
-	server.listen(config.zabbix.ingestPort, "127.0.0.1", () => {
-		logger.info(`Servidor de ingest do Zabbix ouvindo em 127.0.0.1:${config.zabbix.ingestPort}.`);
+	// Todas as interfaces - a porta é publicada direto (container ou rede local), sem proxy na
+	// frente. Segurança fica por conta do secret (X-Zabbix-Secret) + allowlist de IP acima, não do bind.
+	server.listen(config.zabbix.ingestPort, "0.0.0.0", () => {
+		logger.info(`Servidor de ingest do Zabbix ouvindo em 0.0.0.0:${config.zabbix.ingestPort}.`);
 	});
 
 	return server;
