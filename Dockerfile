@@ -13,6 +13,11 @@ FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json bun.lock tsconfig.json ./
 COPY src ./src
+COPY scripts ./scripts
+# check:commands importa @/config pra montar a árvore de comandos, e o config exige as env vars
+# obrigatórias (token do bot, credenciais do banco) só de ser importado - valores fake bastam aqui,
+# é só validação estrutural, nada disso roda de verdade nem sobrevive além desta stage de build.
+ENV BOT_TOKEN=build BOT_CLIENT_ID=build POSTGRES_DB=build POSTGRES_PASSWORD=build
 RUN bun run build
 
 # ---- production-only deps for the final image ----
