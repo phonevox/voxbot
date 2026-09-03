@@ -1,4 +1,4 @@
-# Sora Bot
+# voxbot
 
 Framework modular para bots de Discord em TypeScript.
 
