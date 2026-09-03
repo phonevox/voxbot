@@ -29,11 +29,17 @@ function resolveReconcileSince(): ReconcileSince {
 
 export const config = {
 	discord: {
-		token: require_env("DISCORD_TOKEN"),
-		clientId: require_env("DISCORD_CLIENT_ID"),
+		token: require_env("BOT_TOKEN"),
+		clientId: require_env("BOT_CLIENT_ID"),
 	},
 	database: {
-		url: require_env("DATABASE_URL"),
+		// Campos discretos em vez de uma DATABASE_URL montada à mão - o `pg` aceita os dois, e
+		// discreto evita ter que lidar com escape/URL-encoding se a senha tiver caractere especial.
+		host: process.env.POSTGRES_HOST ?? "localhost",
+		port: parseInt(process.env.POSTGRES_PORT ?? "5432", 10),
+		database: require_env("POSTGRES_DB"),
+		user: process.env.POSTGRES_USER ?? "postgres",
+		password: require_env("POSTGRES_PASSWORD"),
 		// Pool sizing: regra prática = (núcleos * 2) + 1
 		poolMax: parseInt(process.env.DB_POOL_MAX ?? "10", 10),
 		poolIdleTimeout: 30_000,

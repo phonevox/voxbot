@@ -22,7 +22,7 @@ Execute os passos na ordem.
    ```bash
    cp .env.example .env
    ```
-2. Preencha `DISCORD_TOKEN`, `DISCORD_CLIENT_ID` e `DATABASE_URL` no `.env`.
+2. Preencha `BOT_TOKEN`, `BOT_CLIENT_ID` e as variáveis `POSTGRES_*` no `.env`.
 3. Instale as dependências:
    ```bash
    bun install

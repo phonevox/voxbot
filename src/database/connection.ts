@@ -18,7 +18,11 @@ let pool: Pool;
 export function getPool(): Pool {
 	if (!pool) {
 		pool = new Pool({
-			connectionString: config.database.url,
+			host: config.database.host,
+			port: config.database.port,
+			database: config.database.database,
+			user: config.database.user,
+			password: config.database.password,
 			max: config.database.poolMax,
 			idleTimeoutMillis: config.database.poolIdleTimeout,
 			ssl: config.database.ssl ? { rejectUnauthorized: false } : undefined,
