@@ -1,13 +1,14 @@
-import { SlashCommandBuilder } from "discord.js";
+import { ChannelType, SlashCommandBuilder } from "discord.js";
 import { config } from "@/config";
 import { getOrCreateGuild, updateGuildSettings } from "@/database/guildRepository";
 import { defineCommand } from "@/define";
 import { CommandCategory } from "@/types";
 import { EmbedFormatter, roleMention } from "@/utils/format";
 import { reconcile, reconcileOne } from "../jobs/reconciliation";
+import { getForumChannelId } from "../repository";
 
-/** Só o cargo operador (guilds.settings) é configurável em runtime - o resto (canal Forum,
- *  intervalos, segredos) é deploy/infra e mora no .env, ver src/config/index.ts. */
+/** Cargo operador e canal Forum (guilds.settings) são configuráveis em runtime - o resto
+ *  (intervalos, segredos, credenciais da API) é deploy/infra e mora no .env, ver src/config/index.ts. */
 export default defineCommand({
 	name: "zabbix",
 	description: "Administração da integração com o Zabbix.",
@@ -26,6 +27,18 @@ export default defineCommand({
 						.setDescription("Define o cargo que pode rodar comandos do Zabbix nas threads.")
 						.addRoleOption((o) =>
 							o.setName("cargo").setDescription("Cargo dos operadores").setRequired(true),
+						),
+				)
+				.addSubcommand((s) =>
+					s
+						.setName("canal-forum")
+						.setDescription("Define o canal Forum onde as threads de evento são criadas.")
+						.addChannelOption((o) =>
+							o
+								.setName("canal")
+								.setDescription("Canal Forum")
+								.addChannelTypes(ChannelType.GuildForum)
+								.setRequired(true),
 						),
 				)
 				.addSubcommand((s) => s.setName("ver").setDescription("Mostra a configuração atual.")),
@@ -55,6 +68,16 @@ export default defineCommand({
 			await updateGuildSettings(interaction.guild.id, { zabbix_operator_role_id: role.id });
 			await interaction.reply({
 				embeds: [EmbedFormatter.success(`Cargo operador definido como ${roleMention(role.id)}.`)],
+				ephemeral: true,
+			});
+			return;
+		}
+
+		if (group === "config" && sub === "canal-forum") {
+			const canal = interaction.options.getChannel("canal", true);
+			await updateGuildSettings(interaction.guild.id, { zabbix_forum_channel_id: canal.id });
+			await interaction.reply({
+				embeds: [EmbedFormatter.success(`Canal Forum definido como <#${canal.id}>.`)],
 				ephemeral: true,
 			});
 			return;
@@ -102,6 +125,17 @@ export default defineCommand({
 			return;
 		}
 
+		if (group === "config" && sub === "canal-forum") {
+			const canal = await args.getChannel("canal");
+			if (!canal || canal.type !== ChannelType.GuildForum) {
+				await message.reply({ embeds: [EmbedFormatter.warn("Uso: `!zabbix config canal-forum #canal` (precisa ser um canal Forum).")] });
+				return;
+			}
+			await updateGuildSettings(message.guild.id, { zabbix_forum_channel_id: canal.id });
+			await message.reply({ embeds: [EmbedFormatter.success(`Canal Forum definido como <#${canal.id}>.`)] });
+			return;
+		}
+
 		if (group === "config" && sub === "ver") {
 			await message.reply({ embeds: [await buildConfigEmbed(message.guild.id)] });
 			return;
@@ -123,12 +157,12 @@ export default defineCommand({
 });
 
 async function buildConfigEmbed(guildId: string) {
-	const guildConfig = await getOrCreateGuild(guildId);
+	const [guildConfig, forumChannelId] = await Promise.all([getOrCreateGuild(guildId), getForumChannelId()]);
 	const operatorRoleId = guildConfig.settings.zabbix_operator_role_id as string | undefined;
 
 	const lines = [
 		`**Cargo operador:** ${operatorRoleId ? roleMention(operatorRoleId) : "não definido"}`,
-		`**Canal Forum:** ${config.zabbix.forumChannelId ? `<#${config.zabbix.forumChannelId}>` : "não definido"}`,
+		`**Canal Forum:** ${forumChannelId ? `<#${forumChannelId}>` : "não definido"}`,
 		`**Reconciliação:** ${reconciliationSummary()}`,
 		`**Janela de arquivamento:** ${Math.round(config.zabbix.archiveDelayMs / 3_600_000)}h`,
 	];

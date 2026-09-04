@@ -3,7 +3,9 @@ import {
 	ButtonBuilder,
 	ButtonStyle,
 	ComponentType,
+	LabelBuilder,
 	ModalBuilder,
+	StringSelectMenuBuilder,
 	TextInputBuilder,
 	TextInputStyle,
 } from "discord.js";
@@ -23,12 +25,14 @@ import {
 	assumirParams,
 	desreconhecerParams,
 	finalizarParams,
-	mensagemParams,
+	type FormOptions,
+	formParams,
 	reconhecerParams,
 	sevParams,
 } from "../zabbix/acknowledge";
 import { acknowledge } from "../zabbix/client";
 import { hasOperatorRole } from "./permissions";
+import { SEVERITY_NAMES } from "./severity";
 
 const logger = new Logger("zabbix.buttons");
 
@@ -41,6 +45,10 @@ const SEV_PREFIX = "zbx-sev:";
 const RECONHECER_PREFIX = "zbx-reconhecer:";
 const DESRECONHECER_PREFIX = "zbx-desreconhecer:";
 const MENSAGEM_INPUT_ID = "mensagem";
+const SEVERIDADE_INPUT_ID = "severidade";
+const RECONHECER_INPUT_ID = "reconhecer";
+const ENCERRAR_INPUT_ID = "encerrar";
+const MANTER_VALUE = "manter";
 
 function eventIdFrom(customId: string, prefix: string): string {
 	return customId.slice(prefix.length);
@@ -195,20 +203,48 @@ async function handleDesreconhecer(interaction: ButtonInteraction): Promise<void
 	});
 }
 
+/**
+ * Um modal só pra mensagem + severidade + reconhecer + encerrar, em vez de quatro interações
+ * separadas - usa Label + select dentro de modal (suportado nessa versão do discord.js/API,
+ * fora do ActionRow<TextInput> clássico). "Não alterar" como opção default em cada select deixa
+ * o operador preencher só o que precisa, sem precisar visitar o form pra cada campo.
+ */
 async function handleMensagemOpen(interaction: ButtonInteraction): Promise<void> {
 	if (!(await requireOperator(interaction))) return;
 
 	const eventId = eventIdFrom(interaction.customId, MENSAGEM_PREFIX);
-	const modal = new ModalBuilder().setCustomId(`${MENSAGEM_PREFIX}${eventId}`).setTitle("Mensagem pro Zabbix");
+	const modal = new ModalBuilder().setCustomId(`${MENSAGEM_PREFIX}${eventId}`).setTitle("Ações no Zabbix");
 
-	const input = new TextInputBuilder()
+	const mensagemInput = new TextInputBuilder()
 		.setCustomId(MENSAGEM_INPUT_ID)
-		.setLabel("Mensagem")
 		.setStyle(TextInputStyle.Paragraph)
-		.setRequired(true)
+		.setRequired(false)
 		.setMaxLength(1000);
 
-	modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+	const severidadeSelect = new StringSelectMenuBuilder().setCustomId(SEVERIDADE_INPUT_ID).addOptions(
+		{ label: "Não alterar", value: MANTER_VALUE, default: true },
+		...SEVERITY_NAMES.slice(0, 6).map((name, i) => ({ label: name, value: String(i) })),
+	);
+
+	const reconhecerSelect = new StringSelectMenuBuilder()
+		.setCustomId(RECONHECER_INPUT_ID)
+		.addOptions(
+			{ label: "Não alterar", value: MANTER_VALUE, default: true },
+			{ label: "Sim", value: "sim" },
+			{ label: "Não", value: "nao" },
+		);
+
+	const encerrarSelect = new StringSelectMenuBuilder()
+		.setCustomId(ENCERRAR_INPUT_ID)
+		.addOptions({ label: "Não", value: "nao", default: true }, { label: "Sim", value: "sim" });
+
+	modal.addComponents(
+		new LabelBuilder().setLabel("Mensagem (opcional)").setTextInputComponent(mensagemInput),
+		new LabelBuilder().setLabel("Alterar severidade?").setStringSelectMenuComponent(severidadeSelect),
+		new LabelBuilder().setLabel("Reconhecer alerta?").setStringSelectMenuComponent(reconhecerSelect),
+		new LabelBuilder().setLabel("Encerrar alerta?").setStringSelectMenuComponent(encerrarSelect),
+	);
+
 	await interaction.showModal(modal);
 }
 
@@ -216,21 +252,37 @@ async function handleMensagemSubmit(interaction: Interaction): Promise<void> {
 	if (!interaction.isModalSubmit() || !interaction.customId.startsWith(MENSAGEM_PREFIX)) return;
 
 	const eventId = eventIdFrom(interaction.customId, MENSAGEM_PREFIX);
-	const mensagem = interaction.fields.getTextInputValue(MENSAGEM_INPUT_ID);
 	const actorMention = `@${interaction.user.username}`;
 
+	const mensagem = interaction.fields.getTextInputValue(MENSAGEM_INPUT_ID).trim();
+	const severidadeRaw = interaction.fields.getStringSelectValues(SEVERIDADE_INPUT_ID)[0];
+	const reconhecerRaw = interaction.fields.getStringSelectValues(RECONHECER_INPUT_ID)[0];
+	const encerrarRaw = interaction.fields.getStringSelectValues(ENCERRAR_INPUT_ID)[0];
+
+	const opts: FormOptions = {
+		mensagem: mensagem || undefined,
+		severidade: severidadeRaw && severidadeRaw !== MANTER_VALUE ? Number(severidadeRaw) : undefined,
+		reconhecer: reconhecerRaw === "sim" || reconhecerRaw === "nao" ? reconhecerRaw : undefined,
+		encerrar: encerrarRaw === "sim",
+	};
+
+	if (!opts.mensagem && opts.severidade === undefined && !opts.reconhecer && !opts.encerrar) {
+		await interaction.reply({ embeds: [EmbedFormatter.warn("Nada foi preenchido - nada foi alterado.")], ephemeral: true });
+		return;
+	}
+
 	try {
-		await acknowledge(mensagemParams(eventId, actorMention, mensagem));
+		await acknowledge(formParams(eventId, actorMention, opts));
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await interaction.reply({
-			embeds: [EmbedFormatter.error("Não consegui mandar essa mensagem pro Zabbix. Tente de novo.")],
+			embeds: [EmbedFormatter.error("Não consegui falar com o Zabbix. Tente de novo.")],
 			ephemeral: true,
 		});
 		return;
 	}
 
-	await interaction.reply({ embeds: [EmbedFormatter.success("Mensagem registrada no Zabbix.")], ephemeral: true });
+	await interaction.reply({ embeds: [EmbedFormatter.success("Atualizado no Zabbix.")], ephemeral: true });
 }
 
 async function handleSeveridade(interaction: Interaction): Promise<void> {

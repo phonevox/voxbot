@@ -21,13 +21,14 @@ const logger = new Logger("zabbix.operatorCommands");
  * discord/buttons.ts) - `!mensagem` voltou como atalho de texto além do botão "Mensagem" (modal),
  * a pedido do usuário, e `!finalizar [mensagem]` na mesma pegada pro botão "Finalizar" (mensagem
  * opcional - o botão não tem como digitar uma). `!zabbix acoes` reposta os botões de ação num post
- * novo, pra não precisar rolar até a primeira mensagem da thread toda vez. `!zabbix detalhes` traz
- * o estado atual + histórico de comentários direto da API.
+ * novo, pra não precisar rolar até a primeira mensagem da thread toda vez. `!zabbix detalhes`
+ * (ou só `!detalhes`, atalho sem o prefixo `zabbix`) traz o estado atual + histórico de
+ * comentários direto da API.
  */
 const MENSAGEM_PATTERN = /^!mensagem\b\s*(.*)$/is;
 const FINALIZAR_PATTERN = /^!finalizar\b\s*(.*)$/is;
 const ACOES_PATTERN = /^!zabbix\s+acoes\b/is;
-const DETALHES_PATTERN = /^!zabbix\s+detalhes\b/is;
+const DETALHES_PATTERN = /^!zabbix\s+detalhes\b|^!detalhes\b/is;
 
 const MAX_HISTORY_ENTRIES = 10;
 

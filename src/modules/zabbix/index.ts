@@ -11,19 +11,23 @@ import { startArchiveJob, stopArchiveJob } from "./jobs/archiver";
 import { reconcile, startReconciliationJob, stopReconciliationJob } from "./jobs/reconciliation";
 import { startIngestServer } from "./http/server";
 import { ZABBIX_SCHEMA } from "./migrations";
+import * as repo from "./repository";
 
 const logger = new Logger("zabbix");
 
 let server: Server | null = null;
 
-/** Variáveis de deploy obrigatórias pra integração funcionar de verdade (ver src/config/index.ts). */
+/**
+ * Variáveis de deploy obrigatórias pra integração funcionar de verdade (ver src/config/index.ts).
+ * Canal Forum não entra aqui - é configurável via `/zabbix config canal-forum` em runtime, não
+ * precisa existir no boot (sem ele, threads só não se criam até alguém configurar).
+ */
 function isConfigured(): boolean {
 	return !!(
 		config.zabbix.webhookSecret &&
 		config.zabbix.apiUrl &&
 		config.zabbix.apiUser &&
-		config.zabbix.apiPassword &&
-		config.zabbix.forumChannelId
+		config.zabbix.apiPassword
 	);
 }
 
@@ -78,9 +82,10 @@ export default defineCog({
 	},
 
 	async onReady(client) {
-		if (!config.zabbix.forumChannelId) return;
+		const channelId = await repo.getForumChannelId();
+		if (!channelId) return;
 
-		const channel = await client.channels.fetch(config.zabbix.forumChannelId).catch(() => null);
+		const channel = await client.channels.fetch(channelId).catch(() => null);
 		if (channel?.type === ChannelType.GuildForum) {
 			await ensureSeverityTags(channel).catch((err) => {
 				logger.error(err instanceof Error ? err : new Error(String(err)));
