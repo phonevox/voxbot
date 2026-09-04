@@ -26,9 +26,10 @@ async function getForumChannel(client: Client): Promise<ForumChannel | null> {
 	return channel;
 }
 
-// Sem prefixo de severidade - a tag do Forum já mostra isso (ver severity.ts), duplicava no título.
+// Sem prefixo de severidade - a tag do Forum já mostra isso (ver severity.ts), duplicava no
+// título. event_id no início facilita achar/acompanhar a thread certa a partir do Zabbix.
 function buildThreadName(payload: WebhookPayload): string {
-	return stringTruncate(`${payload.host_name} - ${payload.event_name}`, 100);
+	return stringTruncate(`[${payload.event_id}] ${payload.host_name} - ${payload.event_name}`, 100);
 }
 
 async function createThread(
