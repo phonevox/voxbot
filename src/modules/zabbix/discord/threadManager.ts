@@ -4,7 +4,7 @@ import { config } from "@/config";
 import { Logger } from "@/utils/logging";
 import * as repo from "../repository";
 import type { EventClassification, WebhookPayload } from "../types";
-import { clampSeverity, ensureSeverityTags, severityName, severityTagId } from "./severity";
+import { RESOLVED_INDEX, clampSeverity, ensureSeverityTags, severityName, severityTagId } from "./severity";
 import { type EventCard, buildProblemCard, buildResolvedCard, buildUpdateCard } from "./template";
 import { stringTruncate } from "./textHelpers";
 
@@ -59,6 +59,23 @@ async function postInExistingThread(client: Client, threadId: string, card: Even
 	return true;
 }
 
+/** Troca a(s) tag(s) da thread pela tag RESOLVIDO, sozinha - problema fechado não é mais "ALTO"/"BAIXO" etc. */
+async function tagAsResolved(client: Client, threadId: string): Promise<void> {
+	const [thread, forumChannel] = await Promise.all([
+		client.channels.fetch(threadId).catch(() => null),
+		getForumChannel(client),
+	]);
+	if (!thread || !thread.isThread() || !forumChannel) return;
+
+	await ensureSeverityTags(forumChannel);
+	const tagId = severityTagId(forumChannel, RESOLVED_INDEX);
+	if (!tagId) return;
+
+	await thread.setAppliedTags([tagId]).catch((err) => {
+		logger.error(err instanceof Error ? err : new Error(String(err)));
+	});
+}
+
 /**
  * Cria a thread pra um evento que o bot já conhece (ou está reivindicando agora) mas que ainda
  * não tem thread válida - path de criação tardia (UPDATE sem PROBLEM prévio) e também de
@@ -93,17 +110,12 @@ async function createLate(
 		return;
 	}
 
-	const card = classification.isProblem
-		? buildProblemCard(payload)
-		: classification.isRecovery
-			? buildResolvedCard(payload)
-			: buildUpdateCard(payload);
+	// RESOLVED nunca chega aqui (guarda acima) - só sobra PROBLEM ou UPDATE.
+	const card = classification.isProblem ? buildProblemCard(payload) : buildUpdateCard(payload);
 
 	const { threadId, headMsgId } = await createThread(forumChannel, payload, card, severity);
 	await repo.setThreadCreated(payload.event_id, threadId, headMsgId);
-
-	if (classification.isRecovery) await repo.markResolved(payload.event_id, severity);
-	else await repo.updateSeverity(payload.event_id, severity);
+	await repo.updateSeverity(payload.event_id, severity);
 }
 
 /**
@@ -136,8 +148,12 @@ export async function findOrCreateThread(
 			return;
 		}
 
-		if (classification.isRecovery) await repo.markResolved(payload.event_id, severity);
-		else await repo.updateSeverity(payload.event_id, severity);
+		if (classification.isRecovery) {
+			await repo.markResolved(payload.event_id, severity);
+			await tagAsResolved(client, existing.discord_thread_id);
+		} else {
+			await repo.updateSeverity(payload.event_id, severity);
+		}
 		return;
 	}
 
