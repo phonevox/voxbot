@@ -1,9 +1,10 @@
 import { defineCog } from "@/define";
 import _quip from "./commands/quip";
+import _request from "./commands/request";
 
 export default defineCog({
-	name: "quipper",
-	description: "Quips aleatórias do bot",
+	name: "developer",
+	description: "Ferramentas de debug/dev - só pro dono do bot.",
 	authors: [{ name: "masutty", id: 188851299255713792n }],
-	commands: [_quip],
+	commands: [_request, _quip],
 });

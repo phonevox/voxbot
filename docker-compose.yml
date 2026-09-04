@@ -14,10 +14,10 @@ services:
       POSTGRES_PORT: "5432"
     volumes:
       - ./logs:/app/logs
-    # Publica a porta de ingest do Zabbix direto no host - sem proxy/túnel no meio. A segurança
-    # do endpoint é o secret (X-Zabbix-Secret) + allowlist de IP (server.ts), não o bind.
-    ports:
-      - "${MOD_ZABBIX_INGEST_PORT:-3001}:${MOD_ZABBIX_INGEST_PORT:-3001}"
+    # Sem "ports:" aqui de propósito - o Dokploy roteia pro endpoint de ingest do Zabbix via
+    # Domain (Traefik), que alcança o container pela rede interna do Docker. Publicar a porta no
+    # host também abriria um caminho direto que ignora o Traefik, quebrando a confiança em
+    # X-Forwarded-For do server.ts (ver o comentário lá).
     depends_on:
       db:
         condition: service_healthy
