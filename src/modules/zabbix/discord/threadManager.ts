@@ -1,6 +1,5 @@
 import { ChannelType } from "discord.js";
 import type { Client, ForumChannel } from "discord.js";
-import { config } from "@/config";
 import { Logger } from "@/utils/logging";
 import * as repo from "../repository";
 import type { EventClassification, WebhookPayload } from "../types";
@@ -20,8 +19,9 @@ export function classifyEvent(payload: WebhookPayload): EventClassification {
 }
 
 async function getForumChannel(client: Client): Promise<ForumChannel | null> {
-	if (!config.zabbix.forumChannelId) return null;
-	const channel = await client.channels.fetch(config.zabbix.forumChannelId).catch(() => null);
+	const channelId = await repo.getForumChannelId();
+	if (!channelId) return null;
+	const channel = await client.channels.fetch(channelId).catch(() => null);
 	if (!channel || channel.type !== ChannelType.GuildForum) return null;
 	return channel;
 }

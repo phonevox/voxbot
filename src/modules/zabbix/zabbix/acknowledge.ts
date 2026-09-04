@@ -48,6 +48,53 @@ export function mensagemParams(
 	return { eventId, bits: ACK_BITS.ADD_MESSAGE, message: userComment(actorMention, mensagem) };
 }
 
+export interface FormOptions {
+	mensagem?: string;
+	/** undefined = não alterar. */
+	severidade?: number;
+	/** undefined = não alterar. */
+	reconhecer?: "sim" | "nao";
+	encerrar?: boolean;
+}
+
+/**
+ * Combina os campos do modal "Ações" (mensagem + severidade + reconhecer + encerrar) num só
+ * `event.acknowledge` - cada campo em branco/"não alterar" simplesmente não liga o bit
+ * correspondente. Mensagem digitada tem prioridade sobre o texto autogerado; sem mensagem mas com
+ * alguma ação marcada, gera um resumo curto (precisa do bit ADD_MESSAGE pra a ação ficar
+ * registrada no histórico, mesma pegadinha das outras funções acima).
+ */
+export function formParams(eventId: string, actorMention: string, opts: FormOptions): AckParams {
+	let bits = 0;
+	const autoParts: string[] = [];
+
+	if (opts.severidade !== undefined) bits |= ACK_BITS.CHANGE_SEVERITY;
+
+	if (opts.reconhecer === "sim") {
+		bits |= ACK_BITS.ACKNOWLEDGE;
+		autoParts.push("reconheceu");
+	} else if (opts.reconhecer === "nao") {
+		bits |= ACK_BITS.UNACKNOWLEDGE;
+		autoParts.push("removeu o reconhecimento");
+	}
+
+	if (opts.encerrar) {
+		bits |= ACK_BITS.CLOSE;
+		autoParts.push("encerrou");
+	}
+
+	let message: string | undefined;
+	if (opts.mensagem) {
+		bits |= ACK_BITS.ADD_MESSAGE;
+		message = userComment(actorMention, opts.mensagem);
+	} else if (autoParts.length > 0) {
+		bits |= ACK_BITS.ADD_MESSAGE;
+		message = `${actorMention} ${autoParts.join(", ")}.`;
+	}
+
+	return { eventId, bits, severity: opts.severidade, message };
+}
+
 /** Mensagem opcional (só o `!finalizar` de texto passa uma - o botão continua sem argumento). */
 export function finalizarParams(eventId: string, actorMention: string, mensagem?: string): AckParams {
 	const base = `Finalizado por ${actorMention}`;

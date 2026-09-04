@@ -1,5 +1,21 @@
+import { config } from "@/config";
 import { query } from "@/database/connection";
 import type { ZbxEventRow } from "./types";
+
+// ─── Canal Forum ──────────────────────────────────────────────────────────────
+
+/**
+ * Canal Forum configurado via `/zabbix config canal-forum` (guilds.settings, prioridade) ou
+ * MOD_ZABBIX_FORUM_CHANNEL_ID (env, fallback pra quem ainda não migrou pro comando). Só uma guild
+ * deveria ter isso setado - a integração é 1 Zabbix : 1 servidor, então busca sem filtrar guild.
+ */
+export async function getForumChannelId(): Promise<string | null> {
+	const res = await query<{ channel_id: string }>(
+		`SELECT settings->>'zabbix_forum_channel_id' AS channel_id FROM guilds
+         WHERE settings->>'zabbix_forum_channel_id' IS NOT NULL LIMIT 1`,
+	);
+	return res.rows[0]?.channel_id ?? config.zabbix.forumChannelId ?? null;
+}
 
 // ─── Dedup de webhook ─────────────────────────────────────────────────────────
 
