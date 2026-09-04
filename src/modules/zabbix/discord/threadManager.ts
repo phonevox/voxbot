@@ -61,8 +61,9 @@ async function postInExistingThread(client: Client, threadId: string, card: Even
 
 /**
  * Cria a thread pra um evento que o bot já conhece (ou está reivindicando agora) mas que ainda
- * não tem thread válida - path de criação tardia (UPDATE/RESOLVED sem PROBLEM prévio) e também de
- * autocorreção (thread existia mas foi deletada manualmente no Discord).
+ * não tem thread válida - path de criação tardia (UPDATE sem PROBLEM prévio) e também de
+ * autocorreção (thread existia mas foi deletada manualmente no Discord). RESOLVED nunca passa
+ * daqui, ver guarda logo abaixo.
  */
 async function createLate(
 	client: Client,
@@ -70,6 +71,14 @@ async function createLate(
 	classification: EventClassification,
 	severity: number,
 ): Promise<void> {
+	// RESOLVED nunca cria thread do zero - só faz sentido postar uma resolução numa thread que já
+	// acompanhou o problema. Sem essa guarda, um RESOLVED "solto" (thread nunca criada, ou apagada
+	// manualmente no Discord) geraria uma thread nova só pra já nascer fechada, o que não faz sentido.
+	if (classification.isRecovery) {
+		logger.warn(`Evento ${payload.event_id} chegou como RESOLVED sem thread existente - ignorado, não cria thread.`);
+		return;
+	}
+
 	const claimed =
 		(await repo.getEvent(payload.event_id)) ??
 		(await repo.tryClaimEvent(payload.event_id, payload.trigger_id, payload.host_name, payload.host_ip, severity));
@@ -121,7 +130,7 @@ export async function findOrCreateThread(
 		const posted = await postInExistingThread(client, existing.discord_thread_id, card);
 
 		if (!posted) {
-			logger.warn(`Thread do evento ${payload.event_id} não existe mais no Discord - recriando.`);
+			logger.warn(`Thread do evento ${payload.event_id} não existe mais no Discord - tentando recriar.`);
 			await repo.clearThread(payload.event_id);
 			await createLate(client, payload, classification, severity);
 			return;
@@ -132,10 +141,11 @@ export async function findOrCreateThread(
 		return;
 	}
 
-	// UPDATE ou RESOLVED sem o PROBLEM original ter criado a thread - nunca descarta o evento,
-	// cria a thread agora mesmo com o que tem disponível e loga como anomalia.
+	// UPDATE ou RESOLVED sem o PROBLEM original ter criado a thread. UPDATE nunca descarta o
+	// evento, cria a thread agora mesmo com o que tem disponível - RESOLVED tem sua própria guarda
+	// dentro de createLate() e é ignorado (ver comentário lá).
 	logger.warn(
-		`Evento ${payload.event_id} chegou como ${classification.isRecovery ? "RESOLVED" : "UPDATE"} sem thread existente - criando tardiamente.`,
+		`Evento ${payload.event_id} chegou como ${classification.isRecovery ? "RESOLVED" : "UPDATE"} sem thread existente.`,
 	);
 	await createLate(client, payload, classification, severity);
 }
