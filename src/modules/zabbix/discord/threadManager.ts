@@ -4,7 +4,7 @@ import { config } from "@/config";
 import { Logger } from "@/utils/logging";
 import * as repo from "../repository";
 import type { EventClassification, WebhookPayload } from "../types";
-import { RESOLVED_INDEX, clampSeverity, ensureSeverityTags, severityName, severityTagId } from "./severity";
+import { RESOLVED_INDEX, clampSeverity, ensureSeverityTags, severityTagId } from "./severity";
 import { type EventCard, buildProblemCard, buildResolvedCard, buildUpdateCard } from "./template";
 import { stringTruncate } from "./textHelpers";
 
@@ -26,8 +26,9 @@ async function getForumChannel(client: Client): Promise<ForumChannel | null> {
 	return channel;
 }
 
-function buildThreadName(payload: WebhookPayload, severity: number): string {
-	return stringTruncate(`[${severityName(severity)}] ${payload.host_name} - ${payload.event_name}`, 100);
+// Sem prefixo de severidade - a tag do Forum já mostra isso (ver severity.ts), duplicava no título.
+function buildThreadName(payload: WebhookPayload): string {
+	return stringTruncate(`${payload.host_name} - ${payload.event_name}`, 100);
 }
 
 async function createThread(
@@ -40,7 +41,7 @@ async function createThread(
 	const tagId = severityTagId(forumChannel, severity);
 
 	const thread = await forumChannel.threads.create({
-		name: buildThreadName(payload, severity),
+		name: buildThreadName(payload),
 		message: { components: card.components, flags: card.flags },
 		appliedTags: tagId ? [tagId] : [],
 	});

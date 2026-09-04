@@ -5,7 +5,7 @@ import { EmbedFormatter } from "@/utils/format";
 import { Logger } from "@/utils/logging";
 import * as repo from "../repository";
 import type { ZbxEventRow } from "../types";
-import { describeAckAction, mensagemParams } from "../zabbix/acknowledge";
+import { describeAckAction, finalizarParams, mensagemParams } from "../zabbix/acknowledge";
 import { acknowledge, getEventDetails, getTriggerDescriptions } from "../zabbix/client";
 import { isResolved } from "./textHelpers";
 import { hasOperatorRole } from "./permissions";
@@ -19,11 +19,13 @@ const logger = new Logger("zabbix.operatorCommands");
  * prefixo configurável da guild, só reconhecidos dentro de uma thread de evento.
  * Assumir/Finalizar/severidade viraram botões/select na primeira mensagem da thread (ver
  * discord/buttons.ts) - `!mensagem` voltou como atalho de texto além do botão "Mensagem" (modal),
- * a pedido do usuário. `!zabbix acoes` reposta os botões de ação num post novo, pra não precisar
- * rolar até a primeira mensagem da thread toda vez. `!zabbix detalhes` traz o estado atual +
- * histórico de comentários direto da API.
+ * a pedido do usuário, e `!finalizar [mensagem]` na mesma pegada pro botão "Finalizar" (mensagem
+ * opcional - o botão não tem como digitar uma). `!zabbix acoes` reposta os botões de ação num post
+ * novo, pra não precisar rolar até a primeira mensagem da thread toda vez. `!zabbix detalhes` traz
+ * o estado atual + histórico de comentários direto da API.
  */
 const MENSAGEM_PATTERN = /^!mensagem\b\s*(.*)$/is;
+const FINALIZAR_PATTERN = /^!finalizar\b\s*(.*)$/is;
 const ACOES_PATTERN = /^!zabbix\s+acoes\b/is;
 const DETALHES_PATTERN = /^!zabbix\s+detalhes\b/is;
 
@@ -51,6 +53,30 @@ async function handleMensagem(message: Message, event: ZbxEventRow, mensagem: st
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await message.reply({ embeds: [EmbedFormatter.error("Não consegui falar com o Zabbix. Tente de novo.")] });
+		return;
+	}
+
+	await message.react("✅").catch(() => {});
+}
+
+/** Atalho de texto do botão "Finalizar" - mensagem opcional, o botão não tem como digitar uma. */
+async function handleFinalizarCmd(message: Message, event: ZbxEventRow, mensagem: string): Promise<void> {
+	if (!message.guild) return;
+
+	if (!(await hasOperatorRole(message.member, message.guild.id))) {
+		await message.reply({
+			embeds: [EmbedFormatter.error("Você não tem o cargo necessário pra comandos do Zabbix.")],
+		});
+		return;
+	}
+
+	const actorMention = `@${message.author.username}`;
+
+	try {
+		await acknowledge(finalizarParams(event.zabbix_event_id, actorMention, mensagem || undefined));
+	} catch (err) {
+		logger.error(err instanceof Error ? err : new Error(String(err)));
+		await message.reply({ embeds: [EmbedFormatter.error("Não consegui finalizar isso no Zabbix. Tente de novo.")] });
 		return;
 	}
 
@@ -152,13 +178,15 @@ export async function handleOperatorMessage(_client: Client, message: Message): 
 		return;
 	}
 
-	const match = MENSAGEM_PATTERN.exec(content);
-	if (!match) return;
+	const mensagemMatch = MENSAGEM_PATTERN.exec(content);
+	const finalizarMatch = FINALIZAR_PATTERN.exec(content);
+	if (!mensagemMatch && !finalizarMatch) return;
 
-	// Fora de uma thread de evento, ignora em silêncio - "!mensagem" digitado numa conversa
-	// qualquer não é um comando errado, é só texto normal.
+	// Fora de uma thread de evento, ignora em silêncio - "!mensagem"/"!finalizar" digitado numa
+	// conversa qualquer não é um comando errado, é só texto normal.
 	const event = await repo.getEventByThreadId(message.channelId);
 	if (!event) return;
 
-	await handleMensagem(message, event, match[1].trim());
+	if (mensagemMatch) await handleMensagem(message, event, mensagemMatch[1].trim());
+	else if (finalizarMatch) await handleFinalizarCmd(message, event, finalizarMatch[1].trim());
 }

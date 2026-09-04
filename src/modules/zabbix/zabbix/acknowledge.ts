@@ -48,12 +48,13 @@ export function mensagemParams(
 	return { eventId, bits: ACK_BITS.ADD_MESSAGE, message: userComment(actorMention, mensagem) };
 }
 
-/** Sem argumento de mensagem - o texto é sempre gerado, não digitado. */
-export function finalizarParams(eventId: string, actorMention: string): AckParams {
+/** Mensagem opcional (só o `!finalizar` de texto passa uma - o botão continua sem argumento). */
+export function finalizarParams(eventId: string, actorMention: string, mensagem?: string): AckParams {
+	const base = `Finalizado por ${actorMention}`;
 	return {
 		eventId,
 		bits: ACK_BITS.CLOSE | ACK_BITS.ADD_MESSAGE,
-		message: `Finalizado por ${actorMention}`,
+		message: mensagem ? `${base}: ${mensagem}` : base,
 	};
 }
 
