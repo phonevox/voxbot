@@ -68,7 +68,8 @@ export function clampSeverity(raw: string): number {
  */
 export async function ensureSeverityTags(forumChannel: ForumChannel): Promise<void> {
 	const existing = new Set(forumChannel.availableTags.map((t) => t.name));
-	const missing = SEVERITY_NAMES.slice(0, 6).filter((name) => !existing.has(name));
+	// Inclui o índice 6 (RESOLVIDO) também - mesma lista, mesmo mecanismo de tag.
+	const missing = SEVERITY_NAMES.filter((name) => !existing.has(name));
 	if (missing.length === 0) return;
 
 	await forumChannel.setAvailableTags([
