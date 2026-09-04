@@ -56,6 +56,12 @@ function dedupKey(payload: WebhookPayload): string {
 	const raw = [
 		payload.event_id,
 		payload.event_source,
+		// event_value/event_update_status são o que realmente distingue PROBLEM/UPDATE/RESOLVED
+		// (ver classifyEvent) - sem eles, um UPDATE de "fechou o problema" e o RESOLVED que vem logo
+		// em seguida podem ter clock/action/message idênticos (mesmas macros {EVENT.UPDATE.*}) e
+		// colidir no hash, fazendo o RESOLVED de verdade ser descartado como duplicado.
+		payload.event_value,
+		payload.event_update_status,
 		dedupClock(payload),
 		payload.event_update_action ?? "",
 		payload.event_update_message ?? "",
