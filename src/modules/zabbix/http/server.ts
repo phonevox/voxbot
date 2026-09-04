@@ -70,12 +70,6 @@ function readBody(req: IncomingMessage): Promise<string> {
 }
 
 async function handleRequest(client: Client, req: IncomingMessage, res: ServerResponse): Promise<void> {
-	// ponytail: log temporário pra diagnosticar 404 vindo do proxy do Dokploy - remover depois de
-	// confirmar o path/método reais que chegam no container. Ver conversa sobre vb.ingest.dev.
-	logger.debug(
-		`Requisição recebida: ${req.method} ${req.url} (esperado: POST ${config.zabbix.webhookPath})`,
-	);
-
 	if (req.method !== "POST" || req.url !== config.zabbix.webhookPath) {
 		res.writeHead(404).end();
 		return;
