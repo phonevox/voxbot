@@ -1,4 +1,4 @@
-import { ChannelType } from "discord.js";
+import { ChannelType, TextDisplayBuilder } from "discord.js";
 import type { Client, ForumChannel } from "discord.js";
 import { Logger } from "@/utils/logging";
 import * as repo from "../repository";
@@ -36,13 +36,25 @@ async function createThread(
 	payload: WebhookPayload,
 	card: EventCard,
 	severity: number,
+	pingRoleId: string | null,
 ): Promise<{ threadId: string; headMsgId: string }> {
 	await ensureSeverityTags(forumChannel);
 	const tagId = severityTagId(forumChannel, severity);
 
+	// Mensagem IsComponentsV2 não aceita `content` - o ping vira um TextDisplay próprio, antes do
+	// Container. `allowedMentions` explícito porque o padrão do discord.js é permissivo, mas aqui
+	// só deve pingar o cargo configurado, nunca @everyone/@here que porventura apareça em algum texto.
+	const components = pingRoleId
+		? [new TextDisplayBuilder().setContent(`<@&${pingRoleId}>`), ...card.components]
+		: card.components;
+
 	const thread = await forumChannel.threads.create({
 		name: buildThreadName(payload),
-		message: { components: card.components, flags: card.flags },
+		message: {
+			components,
+			flags: card.flags,
+			allowedMentions: { roles: pingRoleId ? [pingRoleId] : [] },
+		},
 		appliedTags: tagId ? [tagId] : [],
 	});
 
@@ -114,7 +126,11 @@ async function createLate(
 	// RESOLVED nunca chega aqui (guarda acima) - só sobra PROBLEM ou UPDATE.
 	const card = classification.isProblem ? buildProblemCard(payload) : buildUpdateCard(payload);
 
-	const { threadId, headMsgId } = await createThread(forumChannel, payload, card, severity);
+	// Só PROBLEM novo pinga - UPDATE/recriação de thread já são silenciosos (ver flags do card),
+	// pingar de novo aí seria ruído.
+	const pingRoleId = classification.isProblem ? await repo.getSeverityRoleId(severity) : null;
+
+	const { threadId, headMsgId } = await createThread(forumChannel, payload, card, severity, pingRoleId);
 	await repo.setThreadCreated(payload.event_id, threadId, headMsgId);
 	await repo.updateSeverity(payload.event_id, severity);
 }
