@@ -17,6 +17,22 @@ export async function getForumChannelId(): Promise<string | null> {
 	return res.rows[0]?.channel_id ?? config.zabbix.forumChannelId ?? null;
 }
 
+// ─── Ping por severidade ────────────────────────────────────────────────────────
+
+/**
+ * Cargo a pingar quando um PROBLEM novo dessa severidade cria uma thread - opcional, configurado
+ * via `/zabbix config ping-severidade`. Sem cargo configurado pra essa severidade = sem ping
+ * (padrão: nenhuma severidade pinga até alguém configurar).
+ */
+export async function getSeverityRoleId(severity: number): Promise<string | null> {
+	const res = await query<{ role_id: string }>(
+		`SELECT settings->'zabbix_severity_role_ids'->>$1 AS role_id FROM guilds
+         WHERE settings->'zabbix_severity_role_ids'->>$1 IS NOT NULL LIMIT 1`,
+		[String(severity)],
+	);
+	return res.rows[0]?.role_id ?? null;
+}
+
 // ─── Dedup de webhook ─────────────────────────────────────────────────────────
 
 /** true = primeira vez que essa entrega chega (deve processar). false = já processada (ignora). */

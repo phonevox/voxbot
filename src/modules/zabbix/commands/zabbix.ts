@@ -6,6 +6,7 @@ import { CommandCategory } from "@/types";
 import { EmbedFormatter, roleMention } from "@/utils/format";
 import { reconcile, reconcileOne } from "../jobs/reconciliation";
 import { getForumChannelId } from "../repository";
+import { SEVERITY_NAMES, severityName } from "../discord/severity";
 
 /** Cargo operador e canal Forum (guilds.settings) são configuráveis em runtime - o resto
  *  (intervalos, segredos, credenciais da API) é deploy/infra e mora no .env, ver src/config/index.ts. */
@@ -39,6 +40,21 @@ export default defineCommand({
 								.setDescription("Canal Forum")
 								.addChannelTypes(ChannelType.GuildForum)
 								.setRequired(true),
+						),
+				)
+				.addSubcommand((s) =>
+					s
+						.setName("ping-severidade")
+						.setDescription("Define (ou remove) o cargo pingado quando abre um problema dessa severidade.")
+						.addStringOption((o) =>
+							o
+								.setName("nivel")
+								.setDescription("Nível de severidade")
+								.setRequired(true)
+								.addChoices(...SEVERITY_NAMES.slice(0, 6).map((name, i) => ({ name, value: String(i) }))),
+						)
+						.addRoleOption((o) =>
+							o.setName("cargo").setDescription("Cargo a pingar (deixe vazio pra remover o ping dessa severidade)"),
 						),
 				)
 				.addSubcommand((s) => s.setName("ver").setDescription("Mostra a configuração atual.")),
@@ -78,6 +94,17 @@ export default defineCommand({
 			await updateGuildSettings(interaction.guild.id, { zabbix_forum_channel_id: canal.id });
 			await interaction.reply({
 				embeds: [EmbedFormatter.success(`Canal Forum definido como <#${canal.id}>.`)],
+				ephemeral: true,
+			});
+			return;
+		}
+
+		if (group === "config" && sub === "ping-severidade") {
+			const nivel = Number(interaction.options.getString("nivel", true));
+			const cargo = interaction.options.getRole("cargo");
+			await setSeverityPing(interaction.guild.id, nivel, cargo?.id ?? null);
+			await interaction.reply({
+				embeds: [EmbedFormatter.success(severityPingMessage(nivel, cargo?.id ?? null))],
 				ephemeral: true,
 			});
 			return;
@@ -136,6 +163,24 @@ export default defineCommand({
 			return;
 		}
 
+		if (group === "config" && sub === "ping-severidade") {
+			const nivelRaw = args.getNumber("nivel");
+			if (nivelRaw === null || nivelRaw < 0 || nivelRaw > 5) {
+				await message.reply({
+					embeds: [
+						EmbedFormatter.warn(
+							"Uso: `!zabbix config ping-severidade <0-5> [@cargo]` (sem cargo remove o ping dessa severidade).",
+						),
+					],
+				});
+				return;
+			}
+			const cargo = await args.getRole("cargo");
+			await setSeverityPing(message.guild.id, nivelRaw, cargo?.id ?? null);
+			await message.reply({ embeds: [EmbedFormatter.success(severityPingMessage(nivelRaw, cargo?.id ?? null))] });
+			return;
+		}
+
 		if (group === "config" && sub === "ver") {
 			await message.reply({ embeds: [await buildConfigEmbed(message.guild.id)] });
 			return;
@@ -156,6 +201,28 @@ export default defineCommand({
 	},
 });
 
+/** Lê+mescla `zabbix_severity_role_ids` na mão - `updateGuildSettings` só mescla um nível, e essa chave é um objeto aninhado. */
+async function setSeverityPing(guildId: string, severity: number, roleId: string | null): Promise<void> {
+	const guildConfig = await getOrCreateGuild(guildId);
+	const current = { ...((guildConfig.settings.zabbix_severity_role_ids as Record<string, string>) ?? {}) };
+	if (roleId) current[String(severity)] = roleId;
+	else delete current[String(severity)];
+	await updateGuildSettings(guildId, { zabbix_severity_role_ids: current });
+}
+
+function severityPingMessage(severity: number, roleId: string | null): string {
+	return roleId
+		? `Ping de severidade ${severityName(severity)} definido como ${roleMention(roleId)}.`
+		: `Ping de severidade ${severityName(severity)} removido.`;
+}
+
+function severityPingSummary(guildConfig: Awaited<ReturnType<typeof getOrCreateGuild>>): string {
+	const map = (guildConfig.settings.zabbix_severity_role_ids as Record<string, string>) ?? {};
+	const entries = Object.entries(map);
+	if (entries.length === 0) return "nenhum";
+	return entries.map(([sev, roleId]) => `${severityName(Number(sev))}: ${roleMention(roleId)}`).join(", ");
+}
+
 async function buildConfigEmbed(guildId: string) {
 	const [guildConfig, forumChannelId] = await Promise.all([getOrCreateGuild(guildId), getForumChannelId()]);
 	const operatorRoleId = guildConfig.settings.zabbix_operator_role_id as string | undefined;
@@ -163,6 +230,7 @@ async function buildConfigEmbed(guildId: string) {
 	const lines = [
 		`**Cargo operador:** ${operatorRoleId ? roleMention(operatorRoleId) : "não definido"}`,
 		`**Canal Forum:** ${forumChannelId ? `<#${forumChannelId}>` : "não definido"}`,
+		`**Ping por severidade:** ${severityPingSummary(guildConfig)}`,
 		`**Reconciliação:** ${reconciliationSummary()}`,
 		`**Janela de arquivamento:** ${Math.round(config.zabbix.archiveDelayMs / 3_600_000)}h`,
 	];
