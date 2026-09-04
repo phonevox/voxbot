@@ -72,11 +72,10 @@ src/
 | Módulo | O que faz |
 |---|---|
 | `core` | Comandos nativos do bot: ping, help, setprefix, administração |
-| `quipper` | Sorteia frases curtas do bot (quips) |
 | `tempvc` | Cria um canal de voz temporário quando alguém entra em um canal gerador |
 | `autobloqueador` | Controla o Auto-Bloqueador Magnus e quem pode usá-lo |
-| `request` | Dispara requisições HTTP arbitrárias, para debug e teste |
 | `zabbix` | Ponte entre o Zabbix e o Discord - cada evento de trigger vira uma thread |
+| `developer` | Ferramentas de debug (quip, request HTTP) - só pro dono do bot, oculto do `/help` |
 
 ## Criar um módulo
 

@@ -14,7 +14,8 @@ export default defineCommand({
 	name: "quip",
 	description: "Sorteia uma quip aleatória.",
 	category: CommandCategory.FUN,
-	showOnHelp: true,
+	botOwnerOnly: true,
+	showOnHelp: false,
 
 	options: new SlashCommandBuilder()
 		.addStringOption((o) =>
