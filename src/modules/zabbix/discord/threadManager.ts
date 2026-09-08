@@ -73,8 +73,13 @@ async function postInExistingThread(client: Client, threadId: string, card: Even
 	return true;
 }
 
-/** Troca a(s) tag(s) da thread pela tag RESOLVIDO, sozinha - problema fechado não é mais "ALTO"/"BAIXO" etc. */
-async function tagAsResolved(client: Client, threadId: string): Promise<void> {
+/**
+ * Troca a(s) tag(s) da thread pela tag da severidade dada, sozinha - a thread sempre reflete o
+ * estado atual, nunca acumula tag antiga junto. Usado tanto pra RESOLVIDO (RESOLVED_INDEX) quanto
+ * pra mudança de severidade normal (`!sev`, select, modal) - qualquer UPDATE que carregue uma
+ * severidade nova re-aplica a tag correspondente.
+ */
+async function setThreadSeverityTag(client: Client, threadId: string, severityIndex: number): Promise<void> {
 	const [thread, forumChannel] = await Promise.all([
 		client.channels.fetch(threadId).catch(() => null),
 		getForumChannel(client),
@@ -82,7 +87,7 @@ async function tagAsResolved(client: Client, threadId: string): Promise<void> {
 	if (!thread || !thread.isThread() || !forumChannel) return;
 
 	await ensureSeverityTags(forumChannel);
-	const tagId = severityTagId(forumChannel, RESOLVED_INDEX);
+	const tagId = severityTagId(forumChannel, severityIndex);
 	if (!tagId) return;
 
 	await thread.setAppliedTags([tagId]).catch((err) => {
@@ -168,9 +173,10 @@ export async function findOrCreateThread(
 
 		if (classification.isRecovery) {
 			await repo.markResolved(payload.event_id, severity);
-			await tagAsResolved(client, existing.discord_thread_id);
+			await setThreadSeverityTag(client, existing.discord_thread_id, RESOLVED_INDEX);
 		} else {
 			await repo.updateSeverity(payload.event_id, severity);
+			await setThreadSeverityTag(client, existing.discord_thread_id, severity);
 		}
 		return;
 	}
