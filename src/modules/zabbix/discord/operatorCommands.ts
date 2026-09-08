@@ -5,7 +5,7 @@ import { EmbedFormatter } from "@/utils/format";
 import { Logger } from "@/utils/logging";
 import * as repo from "../repository";
 import type { ZbxEventRow } from "../types";
-import { describeAckAction, finalizarParams, mensagemParams } from "../zabbix/acknowledge";
+import { describeAckAction, finalizarParams, mensagemParams, sevParams } from "../zabbix/acknowledge";
 import { acknowledge, getEventDetails, getTriggerDescriptions } from "../zabbix/client";
 import { isResolved } from "./textHelpers";
 import { hasOperatorRole } from "./permissions";
@@ -20,13 +20,15 @@ const logger = new Logger("zabbix.operatorCommands");
  * Assumir/Finalizar/severidade viraram botões/select na primeira mensagem da thread (ver
  * discord/buttons.ts) - `!mensagem` voltou como atalho de texto além do botão "Mensagem" (modal),
  * a pedido do usuário, e `!finalizar [mensagem]` na mesma pegada pro botão "Finalizar" (mensagem
- * opcional - o botão não tem como digitar uma). `!zabbix acoes` reposta os botões de ação num post
- * novo, pra não precisar rolar até a primeira mensagem da thread toda vez. `!zabbix detalhes`
- * (ou só `!detalhes`, atalho sem o prefixo `zabbix`) traz o estado atual + histórico de
- * comentários direto da API.
+ * opcional - o botão não tem como digitar uma), e `!sev <0-5> [mensagem]` de volta na mesma
+ * pegada pro select de severidade. `!zabbix acoes` reposta os botões de ação num post novo, pra
+ * não precisar rolar até a primeira mensagem da thread toda vez. `!zabbix detalhes` (ou só
+ * `!detalhes`, atalho sem o prefixo `zabbix`) traz o estado atual + histórico de comentários
+ * direto da API.
  */
 const MENSAGEM_PATTERN = /^!mensagem\b\s*(.*)$/is;
 const FINALIZAR_PATTERN = /^!finalizar\b\s*(.*)$/is;
+const SEV_PATTERN = /^!sev\b\s*([0-5])\s*(.*)$/is;
 const ACOES_PATTERN = /^!zabbix\s+acoes\b/is;
 const DETALHES_PATTERN = /^!zabbix\s+detalhes\b|^!detalhes\b/is;
 
@@ -78,6 +80,30 @@ async function handleFinalizarCmd(message: Message, event: ZbxEventRow, mensagem
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await message.reply({ embeds: [EmbedFormatter.error("Não consegui finalizar isso no Zabbix. Tente de novo.")] });
+		return;
+	}
+
+	await message.react("✅").catch(() => {});
+}
+
+/** Atalho de texto do select de severidade - mesma regra de "!ack" na mensagem do sevParams. */
+async function handleSevCmd(message: Message, event: ZbxEventRow, severidade: number, mensagem: string): Promise<void> {
+	if (!message.guild) return;
+
+	if (!(await hasOperatorRole(message.member, message.guild.id))) {
+		await message.reply({
+			embeds: [EmbedFormatter.error("Você não tem o cargo necessário pra comandos do Zabbix.")],
+		});
+		return;
+	}
+
+	const actorMention = `@${message.author.username}`;
+
+	try {
+		await acknowledge(sevParams(event.zabbix_event_id, actorMention, severidade, mensagem || undefined));
+	} catch (err) {
+		logger.error(err instanceof Error ? err : new Error(String(err)));
+		await message.reply({ embeds: [EmbedFormatter.error("Não consegui mudar a severidade no Zabbix. Tente de novo.")] });
 		return;
 	}
 
@@ -181,13 +207,15 @@ export async function handleOperatorMessage(_client: Client, message: Message): 
 
 	const mensagemMatch = MENSAGEM_PATTERN.exec(content);
 	const finalizarMatch = FINALIZAR_PATTERN.exec(content);
-	if (!mensagemMatch && !finalizarMatch) return;
+	const sevMatch = SEV_PATTERN.exec(content);
+	if (!mensagemMatch && !finalizarMatch && !sevMatch) return;
 
-	// Fora de uma thread de evento, ignora em silêncio - "!mensagem"/"!finalizar" digitado numa
-	// conversa qualquer não é um comando errado, é só texto normal.
+	// Fora de uma thread de evento, ignora em silêncio - "!mensagem"/"!finalizar"/"!sev" digitado
+	// numa conversa qualquer não é um comando errado, é só texto normal.
 	const event = await repo.getEventByThreadId(message.channelId);
 	if (!event) return;
 
 	if (mensagemMatch) await handleMensagem(message, event, mensagemMatch[1].trim());
 	else if (finalizarMatch) await handleFinalizarCmd(message, event, finalizarMatch[1].trim());
+	else if (sevMatch) await handleSevCmd(message, event, Number(sevMatch[1]), sevMatch[2].trim());
 }

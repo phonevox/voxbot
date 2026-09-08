@@ -1,4 +1,4 @@
-import { ChannelType, SlashCommandBuilder } from "discord.js";
+import { ChannelType, type GuildMember, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { config } from "@/config";
 import { getOrCreateGuild, updateGuildSettings } from "@/database/guildRepository";
 import { defineCommand } from "@/define";
@@ -8,13 +8,25 @@ import { reconcile, reconcileOne } from "../jobs/reconciliation";
 import { getForumChannelId } from "../repository";
 import { SEVERITY_NAMES, severityName } from "../discord/severity";
 
-/** Cargo operador e canal Forum (guilds.settings) são configuráveis em runtime - o resto
- *  (intervalos, segredos, credenciais da API) é deploy/infra e mora no .env, ver src/config/index.ts. */
+/**
+ * Sem `adminOnly` no nível do comando de propósito: "!zabbix acoes"/"!zabbix detalhes" são
+ * atalhos informais (ver discord/operatorCommands.ts), não subcomandos de verdade - se o comando
+ * inteiro exigisse admin, o CommandHandler bloquearia esses atalhos pra qualquer operador não-admin
+ * ANTES mesmo do listener informal rodar (bug real, já aconteceu). Em vez disso, cada subcomando
+ * real (config/reconciliar) checa admin na mão via `requireAdmin`; um "subcomando" desconhecido
+ * como "acoes" simplesmente não bate em nenhum `if` e não responde nada, deixando o listener
+ * informal cuidar sozinho.
+ */
+function isAdmin(member: GuildMember | null): boolean {
+	return member?.permissions.has(PermissionFlagsBits.Administrator) ?? false;
+}
+
+const ADMIN_ONLY_MSG = "Este comando requer permissão de administrador!";
+
 export default defineCommand({
 	name: "zabbix",
 	description: "Administração da integração com o Zabbix.",
 	category: CommandCategory.ADMIN,
-	adminOnly: true,
 	showOnHelp: true,
 
 	options: new SlashCommandBuilder()
@@ -79,6 +91,11 @@ export default defineCommand({
 		const group = interaction.options.getSubcommandGroup(false);
 		const sub = interaction.options.getSubcommand(true);
 
+		if ((group === "config" || sub === "reconciliar") && !isAdmin(interaction.member as GuildMember | null)) {
+			await interaction.reply({ embeds: [EmbedFormatter.error(ADMIN_ONLY_MSG)], ephemeral: true });
+			return;
+		}
+
 		if (group === "config" && sub === "cargo-operador") {
 			const role = interaction.options.getRole("cargo", true);
 			await updateGuildSettings(interaction.guild.id, { zabbix_operator_role_id: role.id });
@@ -138,6 +155,11 @@ export default defineCommand({
 
 		const group = args.getSubcommandGroup();
 		const sub = args.getSubcommand();
+
+		if ((group === "config" || sub === "reconciliar") && !isAdmin(message.member)) {
+			await message.reply({ embeds: [EmbedFormatter.error(ADMIN_ONLY_MSG)] });
+			return;
+		}
 
 		if (group === "config" && sub === "cargo-operador") {
 			const role = await args.getRole("cargo");
