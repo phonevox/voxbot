@@ -9,14 +9,14 @@ import {
 } from "discord.js";
 import type { EventClassification, WebhookPayload } from "../types";
 import {
+	clampSeverity,
 	RESOLVED_INDEX,
 	SEVERITY_NAMES,
-	UPDATE_COLOR,
-	UPDATE_THUMB,
-	clampSeverity,
 	severityColor,
 	severityName,
 	severityThumb,
+	UPDATE_COLOR,
+	UPDATE_THUMB,
 } from "./severity";
 import {
 	blockquote,
@@ -41,23 +41,44 @@ import {
  */
 export interface EventCard {
 	flags: number;
-	components: (ContainerBuilder | ActionRowBuilder<ButtonBuilder> | ActionRowBuilder<StringSelectMenuBuilder>)[];
+	components: (
+		| ContainerBuilder
+		| ActionRowBuilder<ButtonBuilder>
+		| ActionRowBuilder<StringSelectMenuBuilder>
+	)[];
 }
 
 export function buildProblemCard(payload: WebhookPayload): EventCard {
-	return buildTriggerCard(payload, { isTrigger: true, isUpdate: false, isRecovery: false, isProblem: true });
+	return buildTriggerCard(payload, {
+		isTrigger: true,
+		isUpdate: false,
+		isRecovery: false,
+		isProblem: true,
+	});
 }
 
 export function buildUpdateCard(payload: WebhookPayload): EventCard {
-	return buildTriggerCard(payload, { isTrigger: true, isUpdate: true, isRecovery: false, isProblem: false });
+	return buildTriggerCard(payload, {
+		isTrigger: true,
+		isUpdate: true,
+		isRecovery: false,
+		isProblem: false,
+	});
 }
 
 export function buildResolvedCard(payload: WebhookPayload): EventCard {
-	return buildTriggerCard(payload, { isTrigger: true, isUpdate: false, isRecovery: true, isProblem: false });
+	return buildTriggerCard(payload, {
+		isTrigger: true,
+		isUpdate: false,
+		isRecovery: true,
+		isProblem: false,
+	});
 }
 
 function addLargeSeparator(container: ContainerBuilder): void {
-	container.addSeparatorComponents((sep) => sep.setDivider(true).setSpacing(SeparatorSpacingSize.Large));
+	container.addSeparatorComponents((sep) =>
+		sep.setDivider(true).setSpacing(SeparatorSpacingSize.Large),
+	);
 }
 
 function addText(container: ContainerBuilder, content: string): void {
@@ -65,7 +86,10 @@ function addText(container: ContainerBuilder, content: string): void {
 }
 
 export function assumirButton(eventId: string): ButtonBuilder {
-	return new ButtonBuilder().setCustomId(`zbx-assumir:${eventId}`).setLabel("Assumir").setStyle(ButtonStyle.Primary);
+	return new ButtonBuilder()
+		.setCustomId(`zbx-assumir:${eventId}`)
+		.setLabel("Assumir")
+		.setStyle(ButtonStyle.Primary);
 }
 
 export function finalizarButton(eventId: string): ButtonBuilder {
@@ -78,7 +102,7 @@ export function finalizarButton(eventId: string): ButtonBuilder {
 export function mensagemButton(eventId: string): ButtonBuilder {
 	return new ButtonBuilder()
 		.setCustomId(`zbx-mensagem:${eventId}`)
-		.setLabel("Mensagem")
+		.setLabel("Interagir")
 		.setStyle(ButtonStyle.Secondary);
 }
 
@@ -101,14 +125,25 @@ export function desreconhecerButton(eventId: string): ButtonBuilder {
 /** Toolbar completa (os três botões de ação) - usada em `!zabbix acoes`. Os cards em si usam só
  * um subconjunto (ver `buildTriggerCard`), pra não ficar poluído toda vez que um evento atualiza. */
 export function actionButtons(eventId: string): ButtonBuilder[] {
-	return [assumirButton(eventId), finalizarButton(eventId), mensagemButton(eventId)];
+	return [
+		assumirButton(eventId),
+		finalizarButton(eventId),
+		mensagemButton(eventId),
+	];
 }
 
-export function severitySelectRow(eventId: string): ActionRowBuilder<StringSelectMenuBuilder> {
+export function severitySelectRow(
+	eventId: string,
+): ActionRowBuilder<StringSelectMenuBuilder> {
 	const select = new StringSelectMenuBuilder()
 		.setCustomId(`zbx-sev:${eventId}`)
 		.setPlaceholder("Mudar severidade...")
-		.addOptions(SEVERITY_NAMES.slice(0, 6).map((name, i) => ({ label: name, value: String(i) })));
+		.addOptions(
+			SEVERITY_NAMES.slice(0, 6).map((name, i) => ({
+				label: name,
+				value: String(i),
+			})),
+		);
 	return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
 }
 
@@ -131,9 +166,14 @@ export function buildActionRows(
 	triggerId: string,
 	zabbixUrl: string,
 	ownerLabel?: string,
-): [ActionRowBuilder<ButtonBuilder>, ActionRowBuilder<StringSelectMenuBuilder>] {
+): [
+	ActionRowBuilder<ButtonBuilder>,
+	ActionRowBuilder<StringSelectMenuBuilder>,
+] {
 	const eventLink = `${zabbixUrl}/tr_events.php?triggerid=${triggerId}&eventid=${eventId}`;
-	const assumir = ownerLabel ? assumidoButton(`Assumido por ${ownerLabel}`) : assumirButton(eventId);
+	const assumir = ownerLabel
+		? assumidoButton(`Assumido por ${ownerLabel}`)
+		: assumirButton(eventId);
 	return [
 		new ActionRowBuilder<ButtonBuilder>().addComponents(
 			linkButton("Ver no Zabbix", eventLink),
@@ -146,16 +186,24 @@ export function buildActionRows(
 }
 
 function linkButton(label: string, url: string): ButtonBuilder {
-	return new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(url);
+	return new ButtonBuilder()
+		.setStyle(ButtonStyle.Link)
+		.setLabel(label)
+		.setURL(url);
 }
 
-function buildTriggerCard(payload: WebhookPayload, classification: EventClassification): EventCard {
+function buildTriggerCard(
+	payload: WebhookPayload,
+	classification: EventClassification,
+): EventCard {
 	const { isUpdate, isRecovery, isProblem } = classification;
 	const nseverity = clampSeverity(payload.event_nseverity);
 
 	const eventLink = `${payload.zabbix_url}/tr_events.php?triggerid=${payload.trigger_id}&eventid=${payload.event_id}`;
 	const hostLine = mdEscape(payload.host_name);
-	const opdata = isResolved(payload.event_opdata) ? stringTruncate(payload.event_opdata, 200) : "";
+	const opdata = isResolved(payload.event_opdata)
+		? stringTruncate(payload.event_opdata, 200)
+		: "";
 
 	let accent: number;
 	let thumb: string;
@@ -181,10 +229,14 @@ function buildTriggerCard(payload: WebhookPayload, classification: EventClassifi
 
 	container.addSectionComponents((section) => {
 		section.addTextDisplayComponents((td) =>
-			td.setContent(`## ${mdLink(stringTruncate(mdEscape(payload.event_name), 200), eventLink)}`),
+			td.setContent(
+				`## ${mdLink(stringTruncate(mdEscape(payload.event_name), 200), eventLink)}`,
+			),
 		);
 		section.addTextDisplayComponents((td) =>
-			td.setContent(`### ${stringTruncate(hostLine, 120)}\n-# [${payload.host_ip ?? ""}]`),
+			td.setContent(
+				`### ${stringTruncate(hostLine, 120)}\n-# [${payload.host_ip ?? ""}]`,
+			),
 		);
 		if (thumb) section.setThumbnailAccessory((t) => t.setURL(thumb));
 		return section;
@@ -194,7 +246,9 @@ function buildTriggerCard(payload: WebhookPayload, classification: EventClassifi
 	// Bloco da atualização, antes dos dados do problema - o comentário do atendente fica sozinho
 	// entre dois separadores, sem disputar atenção com severidade/dados abaixo (fora no update).
 	if (isUpdate) {
-		const actor = isResolved(payload.event_update_user) ? payload.event_update_user : "Alguém";
+		const actor = isResolved(payload.event_update_user)
+			? payload.event_update_user
+			: "Alguém";
 		let updateText = `- **${mdEscape(actor)}** ${stringTruncate(translateUpdateAction(payload.event_update_action), 300)}`;
 		if (isResolved(payload.event_update_message)) {
 			updateText += `\n${blockquote(stringTruncate(payload.event_update_message, 800))}`;
@@ -218,7 +272,10 @@ function buildTriggerCard(payload: WebhookPayload, classification: EventClassifi
 	}
 	if (isRecovery) {
 		const start = zbxToDate(payload.event_date, payload.event_time);
-		const end = zbxToDate(payload.event_recovery_date, payload.event_recovery_time);
+		const end = zbxToDate(
+			payload.event_recovery_date,
+			payload.event_recovery_time,
+		);
 		if (start && end) {
 			const dur = humanDuration(end.getTime() - start.getTime());
 			if (dur) dataLines.push(bulletLine("Duração", dur, true));
@@ -230,8 +287,13 @@ function buildTriggerCard(payload: WebhookPayload, classification: EventClassifi
 	}
 
 	let stampDate: Date | null;
-	if (isUpdate) stampDate = zbxToDate(payload.event_update_date, payload.event_update_time);
-	else if (isRecovery) stampDate = zbxToDate(payload.event_recovery_date, payload.event_recovery_time);
+	if (isUpdate)
+		stampDate = zbxToDate(payload.event_update_date, payload.event_update_time);
+	else if (isRecovery)
+		stampDate = zbxToDate(
+			payload.event_recovery_date,
+			payload.event_recovery_time,
+		);
 	else stampDate = zbxToDate(payload.event_date, payload.event_time);
 
 	addText(
@@ -240,7 +302,9 @@ function buildTriggerCard(payload: WebhookPayload, classification: EventClassifi
 			[
 				`ID: ${payload.event_id}`,
 				payload.host_uid ? `HUID: ${payload.host_uid}` : "",
-				isResolved(payload.event_tags) ? stringTruncate(payload.event_tags, 200) : "",
+				isResolved(payload.event_tags)
+					? stringTruncate(payload.event_tags, 200)
+					: "",
 				relativeStamp(stampDate),
 			],
 			" // ",
@@ -250,7 +314,10 @@ function buildTriggerCard(payload: WebhookPayload, classification: EventClassifi
 	// Padronizado: problema novo = Ver no Zabbix, Mensagem, Assumir, Reconhecer, Desreconhecer (5,
 	// no limite da ActionRow). Update/resolução = só Ver no Zabbix, Mensagem - Finalizar e mudar
 	// severidade ficam pro `!zabbix acoes` (toolbar completa), pra não poluir toda vez que o evento atualiza.
-	const buttons: ButtonBuilder[] = [linkButton("Ver no Zabbix", eventLink), mensagemButton(payload.event_id)];
+	const buttons: ButtonBuilder[] = [
+		linkButton("Ver no Zabbix", eventLink),
+		mensagemButton(payload.event_id),
+	];
 	if (isProblem) {
 		buttons.push(
 			assumirButton(payload.event_id),
@@ -261,7 +328,9 @@ function buildTriggerCard(payload: WebhookPayload, classification: EventClassifi
 
 	const components: EventCard["components"] = [container];
 	if (buttons.length > 0) {
-		components.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons));
+		components.push(
+			new ActionRowBuilder<ButtonBuilder>().addComponents(buttons),
+		);
 	}
 
 	// Select de severidade, linha própria (Discord não deixa misturar select com botão na mesma

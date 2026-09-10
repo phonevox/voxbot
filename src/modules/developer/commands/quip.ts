@@ -27,22 +27,25 @@ export default defineCommand({
 		.addIntegerOption((o) =>
 			o
 				.setName("funnylevel")
-				.setDescription(`Nível máximo de piada (padrão: ${DEFAULT_FUNNY_LEVEL})`)
+				.setDescription(
+					`Nível máximo de piada (padrão: ${DEFAULT_FUNNY_LEVEL})`,
+				)
 				.setMinValue(0)
 				.setMaxValue(3),
 		),
 
 	async executeAsSlash(interaction) {
 		const tipo = interaction.options.getString("tipo") as QuipTypes | null;
-		const funnyLevel = interaction.options.getInteger("funnylevel") ?? undefined;
-		await interaction.reply({ embeds: [buildEmbed(tipo, funnyLevel)] });
+		const funnyLevel =
+			interaction.options.getInteger("funnylevel") ?? undefined;
+		await interaction.reply(buildReply(tipo, funnyLevel));
 	},
 
 	async executeAsPrefix(message, args) {
 		const rawTipo = args.getString("tipo");
 		const tipo = rawTipo && isQuipType(rawTipo) ? rawTipo : null;
 		const funnyLevel = args.getNumber("funnylevel") ?? undefined;
-		await message.reply({ embeds: [buildEmbed(tipo, funnyLevel)] });
+		await message.reply(buildReply(tipo, funnyLevel));
 	},
 });
 
@@ -50,9 +53,9 @@ function randomType(): QuipTypes {
 	return TYPE_CHOICES[Math.floor(Math.random() * TYPE_CHOICES.length)];
 }
 
-function buildEmbed(tipo: QuipTypes | null, funnyLevel: number | undefined) {
+function buildReply(tipo: QuipTypes | null, funnyLevel: number | undefined) {
 	const resolvedType = tipo ?? randomType();
-	return EmbedFormatter.info(getRandomQuip(resolvedType, funnyLevel ?? DEFAULT_FUNNY_LEVEL)).setFooter({
-		text: `tipo: ${resolvedType}`,
-	});
+	const quip = getRandomQuip(resolvedType, funnyLevel ?? DEFAULT_FUNNY_LEVEL);
+	// Components V2 não tem footer separado - a mesma info vira uma linha de subtexto (`-#`).
+	return EmbedFormatter.info(`${quip}\n-# tipo: ${resolvedType}`);
 }

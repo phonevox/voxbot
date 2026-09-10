@@ -3,7 +3,7 @@ import { config } from "@/config";
 import { getGuildPrefix } from "@/database/guildRepository";
 import { defineCommand } from "@/define";
 import { CommandCategory } from "@/types";
-import { EmbedFormatter } from "@/utils/format";
+import { EmbedFormatter, extractCodeBlock } from "@/utils/format";
 import { Logger } from "@/utils/logging";
 
 const logger = new Logger("request.command");
@@ -22,21 +22,18 @@ interface RequestSpec {
 	query?: Record<string, string>;
 }
 
-function extractJson(text: string): string {
-	const fenced = /```(?:\w+\n)?([\s\S]*?)```/.exec(text);
-	return (fenced ? fenced[1] : text).trim();
-}
-
 /** Faz o parse de um JSON solto (não exige campo nenhum) - reusado pelos dois modos. */
 function parseJsonObject(text: string): Record<string, unknown> {
-	const json = extractJson(text);
+	const json = extractCodeBlock(text);
 	if (!json) return {};
 
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(json);
 	} catch (err) {
-		throw new Error(`JSON inválido: ${err instanceof Error ? err.message : String(err)}`);
+		throw new Error(
+			`JSON inválido: ${err instanceof Error ? err.message : String(err)}`,
+		);
 	}
 
 	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
@@ -45,7 +42,9 @@ function parseJsonObject(text: string): Record<string, unknown> {
 	return parsed as Record<string, unknown>;
 }
 
-function extractOptionalFields(obj: Record<string, unknown>): Pick<RequestSpec, "headers" | "body" | "query"> {
+function extractOptionalFields(
+	obj: Record<string, unknown>,
+): Pick<RequestSpec, "headers" | "body" | "query"> {
 	return {
 		headers:
 			typeof obj.headers === "object" && obj.headers !== null
@@ -53,7 +52,9 @@ function extractOptionalFields(obj: Record<string, unknown>): Pick<RequestSpec, 
 				: undefined,
 		body: obj.body,
 		query:
-			typeof obj.query === "object" && obj.query !== null ? (obj.query as Record<string, string>) : undefined,
+			typeof obj.query === "object" && obj.query !== null
+				? (obj.query as Record<string, string>)
+				: undefined,
 	};
 }
 
@@ -77,11 +78,16 @@ function parseSpec(raw: string): RequestSpec {
 			);
 		}
 		const [, method, url, tail] = simpleMatch;
-		return { method, url, ...(tail.trim() ? extractOptionalFields(parseJsonObject(tail)) : {}) };
+		return {
+			method,
+			url,
+			...(tail.trim() ? extractOptionalFields(parseJsonObject(tail)) : {}),
+		};
 	}
 
 	const obj = parseJsonObject(raw);
-	if (typeof obj.url !== "string" || !obj.url) throw new Error('Campo "url" obrigatório.');
+	if (typeof obj.url !== "string" || !obj.url)
+		throw new Error('Campo "url" obrigatório.');
 	return {
 		method: typeof obj.method === "string" ? obj.method : undefined,
 		url: obj.url,
@@ -116,7 +122,8 @@ async function runRequest(spec: RequestSpec): Promise<RequestResult> {
 		throw new Error(`URL inválida: "${spec.url}".`);
 	}
 	if (spec.query) {
-		for (const [key, value] of Object.entries(spec.query)) url.searchParams.set(key, String(value));
+		for (const [key, value] of Object.entries(spec.query))
+			url.searchParams.set(key, String(value));
 	}
 
 	const method = (spec.method ?? "GET").toUpperCase();
@@ -124,7 +131,8 @@ async function runRequest(spec: RequestSpec): Promise<RequestResult> {
 	let body: string | undefined;
 
 	if (spec.body !== undefined && method !== "GET" && method !== "HEAD") {
-		body = typeof spec.body === "string" ? spec.body : JSON.stringify(spec.body);
+		body =
+			typeof spec.body === "string" ? spec.body : JSON.stringify(spec.body);
 		if (!Object.keys(headers).some((h) => h.toLowerCase() === "content-type")) {
 			headers["Content-Type"] = "application/json";
 		}
@@ -135,7 +143,12 @@ async function runRequest(spec: RequestSpec): Promise<RequestResult> {
 	const start = Date.now();
 
 	try {
-		const res = await fetch(url, { method, headers, body, signal: controller.signal });
+		const res = await fetch(url, {
+			method,
+			headers,
+			body,
+			signal: controller.signal,
+		});
 		const ms = Date.now() - start;
 		const buf = await res.arrayBuffer();
 		const truncated = buf.byteLength > MAX_BODY_BYTES;
@@ -159,12 +172,15 @@ function formatBody(body: string): string {
 	} catch {
 		// não é JSON - mostra cru mesmo
 	}
-	return display.length > MAX_DISPLAY_CHARS ? `${display.slice(0, MAX_DISPLAY_CHARS)}\n...(cortado)` : display;
+	return display.length > MAX_DISPLAY_CHARS
+		? `${display.slice(0, MAX_DISPLAY_CHARS)}\n...(cortado)`
+		: display;
 }
 
 export default defineCommand({
 	name: "request",
-	description: "Faz uma requisição HTTP arbitrária, pra debug (só via !request, não slash).",
+	description:
+		"Faz uma requisição HTTP arbitrária, pra debug (só via !request, não slash).",
 	category: CommandCategory.ADMIN,
 	// SSRF/abuso reais aqui (o bot vira um proxy pra requisição arbitrária, headers inclusos) -
 	// o dono do bot já tem controle total do processo de qualquer forma (!bot shutdown, load de
@@ -174,19 +190,22 @@ export default defineCommand({
 
 	async executeAsSlash(interaction, _client) {
 		await interaction.reply({
-			embeds: [
-				EmbedFormatter.info(
-					"Esse comando só funciona via prefixo (`!request`) - precisa colar um JSON em bloco de código ou responder a uma mensagem, o que não dá pra fazer num slash command.",
-				),
-			],
+			...EmbedFormatter.info(
+				"Esse comando só funciona via prefixo (`!request`) - precisa colar um JSON em bloco de código ou responder a uma mensagem, o que não dá pra fazer num slash command.",
+			),
 			ephemeral: true,
 		});
 	},
 
 	async executeAsPrefix(message, _args, _client) {
-		const prefix = message.guild ? await getGuildPrefix(message.guild.id) : config.bot.defaultPrefix;
+		const prefix = message.guild
+			? await getGuildPrefix(message.guild.id)
+			: config.bot.defaultPrefix;
 		const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		const requestPrefixPattern = new RegExp(`^${escapedPrefix}request\\s*`, "i");
+		const requestPrefixPattern = new RegExp(
+			`^${escapedPrefix}request\\s*`,
+			"i",
+		);
 
 		// A mensagem respondida pode ser ela mesma um "!request <bloco>" (não só JSON cru) - corta
 		// o prefixo do comando dos dois lados antes de extrair, senão o "!request " sobra colado
@@ -194,20 +213,21 @@ export default defineCommand({
 		let source = message.content.replace(requestPrefixPattern, "").trim();
 
 		if (!source && message.reference?.messageId) {
-			const replied = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
-			if (replied) source = replied.content.replace(requestPrefixPattern, "").trim();
+			const replied = await message.channel.messages
+				.fetch(message.reference.messageId)
+				.catch(() => null);
+			if (replied)
+				source = replied.content.replace(requestPrefixPattern, "").trim();
 		}
 
 		if (!source) {
-			await message.reply({
-				embeds: [
-					EmbedFormatter.warn(
-						"Cole um JSON depois do comando (bloco de código ou não), ou responda a uma mensagem que tenha o JSON.\n" +
-							"Simples: `!request get https://exemplo.com {\"headers\":{...},\"body\":{...},\"query\":{...}}`\n" +
-							'Completo: `{ "method": "POST", "url": "...", "headers": {...}, "body": {...}, "query": {...} }`',
-					),
-				],
-			});
+			await message.reply(
+				EmbedFormatter.warn(
+					"Cole um JSON depois do comando (bloco de código ou não), ou responda a uma mensagem que tenha o JSON.\n" +
+						'Simples: `!request get https://exemplo.com {"headers":{...},"body":{...},"query":{...}}`\n' +
+						'Completo: `{ "method": "POST", "url": "...", "headers": {...}, "body": {...}, "query": {...} }`',
+				),
+			);
 			return;
 		}
 
@@ -215,7 +235,9 @@ export default defineCommand({
 		try {
 			spec = parseSpec(source);
 		} catch (err) {
-			await message.reply({ embeds: [EmbedFormatter.error(err instanceof Error ? err.message : String(err))] });
+			await message.reply(
+				EmbedFormatter.error(err instanceof Error ? err.message : String(err)),
+			);
 			return;
 		}
 
@@ -225,16 +247,25 @@ export default defineCommand({
 			const html = looksLikeHtml(result.contentType, result.body);
 			const embed = new EmbedBuilder()
 				.setColor(html ? 0xffff00 : ok ? 0x57f287 : 0xff0000)
-				.setTitle(`${spec.method?.toUpperCase() ?? "GET"} ${spec.url}`.slice(0, 256))
+				.setTitle(
+					`${spec.method?.toUpperCase() ?? "GET"} ${spec.url}`.slice(0, 256),
+				)
 				.addFields(
-					{ name: "Status", value: `${result.status} ${result.statusText}`, inline: true },
+					{
+						name: "Status",
+						value: `${result.status} ${result.statusText}`,
+						inline: true,
+					},
 					{ name: "Tempo", value: `${result.ms}ms`, inline: true },
 				)
-				.setDescription(`\`\`\`\n${formatBody(result.body) || "(vazio)"}\n\`\`\``);
+				.setDescription(
+					`\`\`\`\n${formatBody(result.body) || "(vazio)"}\n\`\`\``,
+				);
 			if (html) {
 				embed.addFields({
 					name: "⚠️ Atenção",
-					value: "A resposta parece ser HTML, não JSON - confere se a URL/rota tá certa.",
+					value:
+						"A resposta parece ser HTML, não JSON - confere se a URL/rota tá certa.",
 				});
 			}
 			await message.reply({ embeds: [embed] });
@@ -246,7 +277,7 @@ export default defineCommand({
 				: err instanceof Error
 					? err.message
 					: String(err);
-			await message.reply({ embeds: [EmbedFormatter.error(msg)] });
+			await message.reply(EmbedFormatter.error(msg));
 		}
 	},
 });

@@ -1,3 +1,12 @@
+import type {
+	ButtonComponent,
+	ButtonInteraction,
+	Client,
+	GuildMember,
+	Interaction,
+	MessageActionRowComponent,
+	MessageComponentInteraction,
+} from "discord.js";
 import {
 	ActionRowBuilder,
 	ButtonBuilder,
@@ -9,23 +18,14 @@ import {
 	TextInputBuilder,
 	TextInputStyle,
 } from "discord.js";
-import type {
-	ButtonComponent,
-	ButtonInteraction,
-	Client,
-	GuildMember,
-	Interaction,
-	MessageActionRowComponent,
-	MessageComponentInteraction,
-} from "discord.js";
 import { EmbedFormatter } from "@/utils/format";
 import { Logger } from "@/utils/logging";
 import * as repo from "../repository";
 import {
 	assumirParams,
 	desreconhecerParams,
-	finalizarParams,
 	type FormOptions,
+	finalizarParams,
 	formParams,
 	reconhecerParams,
 	sevParams,
@@ -55,12 +55,16 @@ function eventIdFrom(customId: string, prefix: string): string {
 }
 
 /** true = autorizado. false = já respondeu com o erro, o caller só precisa dar `return`. */
-async function requireOperator(interaction: MessageComponentInteraction): Promise<boolean> {
+async function requireOperator(
+	interaction: MessageComponentInteraction,
+): Promise<boolean> {
 	const member = interaction.member as GuildMember | null;
 	if (await hasOperatorRole(member, interaction.guildId ?? "")) return true;
 
 	await interaction.reply({
-		embeds: [EmbedFormatter.error("Você não tem o cargo necessário pra comandos do Zabbix.")],
+		...EmbedFormatter.error(
+			"Você não tem o cargo necessário pra comandos do Zabbix.",
+		),
 		ephemeral: true,
 	});
 	return false;
@@ -71,16 +75,25 @@ async function requireOperator(interaction: MessageComponentInteraction): Promis
  * botões e o select de severidade - então "a última linha" não é mais garantia de ser a certa).
  * Nunca reconstrói o Container inteiro.
  */
-async function disableClickedButton(interaction: ButtonInteraction, label: string): Promise<void> {
+async function disableClickedButton(
+	interaction: ButtonInteraction,
+	label: string,
+): Promise<void> {
 	const rows = interaction.message.components;
 	const rowIndex = rows.findIndex(
 		(row): row is Extract<typeof row, { type: ComponentType.ActionRow }> =>
 			row.type === ComponentType.ActionRow &&
-			row.components.some((c) => c.type === ComponentType.Button && c.customId === interaction.customId),
+			row.components.some(
+				(c) =>
+					c.type === ComponentType.Button &&
+					c.customId === interaction.customId,
+			),
 	);
 	if (rowIndex === -1) return;
 
-	const targetRow = rows[rowIndex] as { components: MessageActionRowComponent[] };
+	const targetRow = rows[rowIndex] as {
+		components: MessageActionRowComponent[];
+	};
 	const keptButtons = targetRow.components
 		.filter(
 			(c): c is ButtonComponent =>
@@ -94,7 +107,10 @@ async function disableClickedButton(interaction: ButtonInteraction, label: strin
 		.setStyle(ButtonStyle.Secondary)
 		.setDisabled(true);
 
-	const newRow = new ActionRowBuilder<ButtonBuilder>().addComponents(disabledButton, ...keptButtons);
+	const newRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+		disabledButton,
+		...keptButtons,
+	);
 	const newComponents = rows.map((row, i) => (i === rowIndex ? newRow : row));
 	await interaction.update({ components: newComponents });
 }
@@ -104,7 +120,9 @@ async function handleAssumir(interaction: ButtonInteraction): Promise<void> {
 	const event = await repo.getEvent(eventId);
 	if (!event) {
 		await interaction.reply({
-			embeds: [EmbedFormatter.error("Esse incidente não existe mais nos meus registros.")],
+			...EmbedFormatter.error(
+				"Esse incidente não existe mais nos meus registros.",
+			),
 			ephemeral: true,
 		});
 		return;
@@ -112,7 +130,9 @@ async function handleAssumir(interaction: ButtonInteraction): Promise<void> {
 
 	if (event.owner_discord_id) {
 		await interaction.reply({
-			embeds: [EmbedFormatter.warn(`Já foi assumido por <@${event.owner_discord_id}>.`)],
+			...EmbedFormatter.warn(
+				`Já foi assumido por <@${event.owner_discord_id}>.`,
+			),
 			ephemeral: true,
 		});
 		return;
@@ -126,14 +146,19 @@ async function handleAssumir(interaction: ButtonInteraction): Promise<void> {
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await interaction.reply({
-			embeds: [EmbedFormatter.error("Não consegui reconhecer isso no Zabbix. Tente de novo.")],
+			...EmbedFormatter.error(
+				"Não consegui reconhecer isso no Zabbix. Tente de novo.",
+			),
 			ephemeral: true,
 		});
 		return;
 	}
 
 	await repo.setOwner(eventId, interaction.user.id);
-	await disableClickedButton(interaction, `Assumido por ${interaction.user.username}`);
+	await disableClickedButton(
+		interaction,
+		`Assumido por ${interaction.user.username}`,
+	);
 }
 
 async function handleFinalizar(interaction: ButtonInteraction): Promise<void> {
@@ -147,13 +172,18 @@ async function handleFinalizar(interaction: ButtonInteraction): Promise<void> {
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await interaction.reply({
-			embeds: [EmbedFormatter.error("Não consegui finalizar isso no Zabbix. Tente de novo.")],
+			...EmbedFormatter.error(
+				"Não consegui finalizar isso no Zabbix. Tente de novo.",
+			),
 			ephemeral: true,
 		});
 		return;
 	}
 
-	await disableClickedButton(interaction, `Finalizado por ${interaction.user.username}`);
+	await disableClickedButton(
+		interaction,
+		`Finalizado por ${interaction.user.username}`,
+	);
 }
 
 /**
@@ -171,16 +201,23 @@ async function handleReconhecer(interaction: ButtonInteraction): Promise<void> {
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await interaction.reply({
-			embeds: [EmbedFormatter.error("Não consegui reconhecer isso no Zabbix. Tente de novo.")],
+			...EmbedFormatter.error(
+				"Não consegui reconhecer isso no Zabbix. Tente de novo.",
+			),
 			ephemeral: true,
 		});
 		return;
 	}
 
-	await interaction.reply({ embeds: [EmbedFormatter.success("Evento reconhecido no Zabbix.")], ephemeral: true });
+	await interaction.reply({
+		...EmbedFormatter.success("Evento reconhecido no Zabbix."),
+		ephemeral: true,
+	});
 }
 
-async function handleDesreconhecer(interaction: ButtonInteraction): Promise<void> {
+async function handleDesreconhecer(
+	interaction: ButtonInteraction,
+): Promise<void> {
 	if (!(await requireOperator(interaction))) return;
 
 	const eventId = eventIdFrom(interaction.customId, DESRECONHECER_PREFIX);
@@ -191,14 +228,16 @@ async function handleDesreconhecer(interaction: ButtonInteraction): Promise<void
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await interaction.reply({
-			embeds: [EmbedFormatter.error("Não consegui remover o reconhecimento no Zabbix. Tente de novo.")],
+			...EmbedFormatter.error(
+				"Não consegui remover o reconhecimento no Zabbix. Tente de novo.",
+			),
 			ephemeral: true,
 		});
 		return;
 	}
 
 	await interaction.reply({
-		embeds: [EmbedFormatter.success("Reconhecimento removido no Zabbix.")],
+		...EmbedFormatter.success("Reconhecimento removido no Zabbix."),
 		ephemeral: true,
 	});
 }
@@ -209,11 +248,15 @@ async function handleDesreconhecer(interaction: ButtonInteraction): Promise<void
  * fora do ActionRow<TextInput> clássico). "Não alterar" como opção default em cada select deixa
  * o operador preencher só o que precisa, sem precisar visitar o form pra cada campo.
  */
-async function handleMensagemOpen(interaction: ButtonInteraction): Promise<void> {
+async function handleMensagemOpen(
+	interaction: ButtonInteraction,
+): Promise<void> {
 	if (!(await requireOperator(interaction))) return;
 
 	const eventId = eventIdFrom(interaction.customId, MENSAGEM_PREFIX);
-	const modal = new ModalBuilder().setCustomId(`${MENSAGEM_PREFIX}${eventId}`).setTitle("Ações no Zabbix");
+	const modal = new ModalBuilder()
+		.setCustomId(`${MENSAGEM_PREFIX}${eventId}`)
+		.setTitle("Ações no Zabbix");
 
 	const mensagemInput = new TextInputBuilder()
 		.setCustomId(MENSAGEM_INPUT_ID)
@@ -221,10 +264,15 @@ async function handleMensagemOpen(interaction: ButtonInteraction): Promise<void>
 		.setRequired(false)
 		.setMaxLength(1000);
 
-	const severidadeSelect = new StringSelectMenuBuilder().setCustomId(SEVERIDADE_INPUT_ID).addOptions(
-		{ label: "Não alterar", value: MANTER_VALUE, default: true },
-		...SEVERITY_NAMES.slice(0, 6).map((name, i) => ({ label: name, value: String(i) })),
-	);
+	const severidadeSelect = new StringSelectMenuBuilder()
+		.setCustomId(SEVERIDADE_INPUT_ID)
+		.addOptions(
+			{ label: "Não alterar", value: MANTER_VALUE, default: true },
+			...SEVERITY_NAMES.slice(0, 6).map((name, i) => ({
+				label: name,
+				value: String(i),
+			})),
+		);
 
 	const reconhecerSelect = new StringSelectMenuBuilder()
 		.setCustomId(RECONHECER_INPUT_ID)
@@ -236,38 +284,72 @@ async function handleMensagemOpen(interaction: ButtonInteraction): Promise<void>
 
 	const encerrarSelect = new StringSelectMenuBuilder()
 		.setCustomId(ENCERRAR_INPUT_ID)
-		.addOptions({ label: "Não", value: "nao", default: true }, { label: "Sim", value: "sim" });
+		.addOptions(
+			{ label: "Não", value: "nao", default: true },
+			{ label: "Sim", value: "sim" },
+		);
 
 	modal.addComponents(
-		new LabelBuilder().setLabel("Mensagem (opcional)").setTextInputComponent(mensagemInput),
-		new LabelBuilder().setLabel("Alterar severidade?").setStringSelectMenuComponent(severidadeSelect),
-		new LabelBuilder().setLabel("Reconhecer alerta?").setStringSelectMenuComponent(reconhecerSelect),
-		new LabelBuilder().setLabel("Encerrar alerta?").setStringSelectMenuComponent(encerrarSelect),
+		new LabelBuilder()
+			.setLabel("Mensagem (opcional)")
+			.setTextInputComponent(mensagemInput),
+		new LabelBuilder()
+			.setLabel("Alterar severidade?")
+			.setStringSelectMenuComponent(severidadeSelect),
+		new LabelBuilder()
+			.setLabel("Reconhecer alerta?")
+			.setStringSelectMenuComponent(reconhecerSelect),
+		new LabelBuilder()
+			.setLabel("Encerrar alerta?")
+			.setStringSelectMenuComponent(encerrarSelect),
 	);
 
 	await interaction.showModal(modal);
 }
 
 async function handleMensagemSubmit(interaction: Interaction): Promise<void> {
-	if (!interaction.isModalSubmit() || !interaction.customId.startsWith(MENSAGEM_PREFIX)) return;
+	if (
+		!interaction.isModalSubmit() ||
+		!interaction.customId.startsWith(MENSAGEM_PREFIX)
+	)
+		return;
 
 	const eventId = eventIdFrom(interaction.customId, MENSAGEM_PREFIX);
 	const actorMention = `@${interaction.user.username}`;
 
-	const mensagem = interaction.fields.getTextInputValue(MENSAGEM_INPUT_ID).trim();
-	const severidadeRaw = interaction.fields.getStringSelectValues(SEVERIDADE_INPUT_ID)[0];
-	const reconhecerRaw = interaction.fields.getStringSelectValues(RECONHECER_INPUT_ID)[0];
-	const encerrarRaw = interaction.fields.getStringSelectValues(ENCERRAR_INPUT_ID)[0];
+	const mensagem = interaction.fields
+		.getTextInputValue(MENSAGEM_INPUT_ID)
+		.trim();
+	const severidadeRaw =
+		interaction.fields.getStringSelectValues(SEVERIDADE_INPUT_ID)[0];
+	const reconhecerRaw =
+		interaction.fields.getStringSelectValues(RECONHECER_INPUT_ID)[0];
+	const encerrarRaw =
+		interaction.fields.getStringSelectValues(ENCERRAR_INPUT_ID)[0];
 
 	const opts: FormOptions = {
 		mensagem: mensagem || undefined,
-		severidade: severidadeRaw && severidadeRaw !== MANTER_VALUE ? Number(severidadeRaw) : undefined,
-		reconhecer: reconhecerRaw === "sim" || reconhecerRaw === "nao" ? reconhecerRaw : undefined,
+		severidade:
+			severidadeRaw && severidadeRaw !== MANTER_VALUE
+				? Number(severidadeRaw)
+				: undefined,
+		reconhecer:
+			reconhecerRaw === "sim" || reconhecerRaw === "nao"
+				? reconhecerRaw
+				: undefined,
 		encerrar: encerrarRaw === "sim",
 	};
 
-	if (!opts.mensagem && opts.severidade === undefined && !opts.reconhecer && !opts.encerrar) {
-		await interaction.reply({ embeds: [EmbedFormatter.warn("Nada foi preenchido - nada foi alterado.")], ephemeral: true });
+	if (
+		!opts.mensagem &&
+		opts.severidade === undefined &&
+		!opts.reconhecer &&
+		!opts.encerrar
+	) {
+		await interaction.reply({
+			...EmbedFormatter.warn("Nada foi preenchido - nada foi alterado."),
+			ephemeral: true,
+		});
 		return;
 	}
 
@@ -276,17 +358,26 @@ async function handleMensagemSubmit(interaction: Interaction): Promise<void> {
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await interaction.reply({
-			embeds: [EmbedFormatter.error("Não consegui falar com o Zabbix. Tente de novo.")],
+			...EmbedFormatter.error(
+				"Não consegui falar com o Zabbix. Tente de novo.",
+			),
 			ephemeral: true,
 		});
 		return;
 	}
 
-	await interaction.reply({ embeds: [EmbedFormatter.success("Atualizado no Zabbix.")], ephemeral: true });
+	await interaction.reply({
+		...EmbedFormatter.success("Atualizado no Zabbix."),
+		ephemeral: true,
+	});
 }
 
 async function handleSeveridade(interaction: Interaction): Promise<void> {
-	if (!interaction.isStringSelectMenu() || !interaction.customId.startsWith(SEV_PREFIX)) return;
+	if (
+		!interaction.isStringSelectMenu() ||
+		!interaction.customId.startsWith(SEV_PREFIX)
+	)
+		return;
 
 	if (!(await requireOperator(interaction))) return;
 
@@ -299,7 +390,9 @@ async function handleSeveridade(interaction: Interaction): Promise<void> {
 	} catch (err) {
 		logger.error(err instanceof Error ? err : new Error(String(err)));
 		await interaction.reply({
-			embeds: [EmbedFormatter.error("Não consegui mudar a severidade no Zabbix. Tente de novo.")],
+			...EmbedFormatter.error(
+				"Não consegui mudar a severidade no Zabbix. Tente de novo.",
+			),
 			ephemeral: true,
 		});
 		return;
@@ -307,16 +400,27 @@ async function handleSeveridade(interaction: Interaction): Promise<void> {
 
 	// Não desabilita nem re-renderiza o select (severidade pode mudar de novo depois) - o card em
 	// si é redesenhado quando o UPDATE volta como webhook.
-	await interaction.reply({ embeds: [EmbedFormatter.success("Severidade atualizada no Zabbix.")], ephemeral: true });
+	await interaction.reply({
+		...EmbedFormatter.success("Severidade atualizada no Zabbix."),
+		ephemeral: true,
+	});
 }
 
-export async function handleZabbixButtons(_client: Client, interaction: Interaction): Promise<void> {
+export async function handleZabbixButtons(
+	_client: Client,
+	interaction: Interaction,
+): Promise<void> {
 	if (interaction.isButton()) {
-		if (interaction.customId.startsWith(ASSUMIR_PREFIX)) return handleAssumir(interaction);
-		if (interaction.customId.startsWith(FINALIZAR_PREFIX)) return handleFinalizar(interaction);
-		if (interaction.customId.startsWith(MENSAGEM_PREFIX)) return handleMensagemOpen(interaction);
-		if (interaction.customId.startsWith(RECONHECER_PREFIX)) return handleReconhecer(interaction);
-		if (interaction.customId.startsWith(DESRECONHECER_PREFIX)) return handleDesreconhecer(interaction);
+		if (interaction.customId.startsWith(ASSUMIR_PREFIX))
+			return handleAssumir(interaction);
+		if (interaction.customId.startsWith(FINALIZAR_PREFIX))
+			return handleFinalizar(interaction);
+		if (interaction.customId.startsWith(MENSAGEM_PREFIX))
+			return handleMensagemOpen(interaction);
+		if (interaction.customId.startsWith(RECONHECER_PREFIX))
+			return handleReconhecer(interaction);
+		if (interaction.customId.startsWith(DESRECONHECER_PREFIX))
+			return handleDesreconhecer(interaction);
 		return;
 	}
 

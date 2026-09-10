@@ -5,10 +5,11 @@ dotenv.config({
 });
 
 import { Events } from "discord.js";
+import { rmSync } from "fs";
 import { join } from "path";
 import { config } from "./config";
 import { BotClient } from "./core/BotClient";
-import { loadCogs } from "./core/CogLoader";
+import { getDclRuntimeDir, loadCogs } from "./core/CogLoader";
 import {
 	registerCommandHandlers,
 	registerSlashCommands,
@@ -28,7 +29,19 @@ async function bootstrap(): Promise<void> {
 	const client = new BotClient();
 
 	const cogsPath = join(__dirname, "modules");
-	stopCogs = await loadCogs(client, cogsPath);
+
+	// Cogs instalados via `!dcl run` não sobrevivem a um restart de propósito - o sandbox inteiro
+	// é limpo aqui, antes até de escanear `cogsPath`, pra garantir isso na prática (não só "o boot
+	// não olha pra lá").
+	rmSync(getDclRuntimeDir(cogsPath), { recursive: true, force: true });
+
+	const { stop, failures } = await loadCogs(client, cogsPath);
+	stopCogs = stop;
+	if (failures.length) {
+		logger.warn(
+			`${failures.length} cog(s) falharam ao carregar no boot: ${failures.map((f) => f.cog).join(", ")}`,
+		);
+	}
 
 	registerCommandHandlers(client);
 
