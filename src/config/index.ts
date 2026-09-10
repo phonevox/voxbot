@@ -97,7 +97,10 @@ export const config = {
 		// horário de Brasília como a suposição original assumia - servidor, não frontend, o que
 		// importa aqui. NÃO depende do timezone de onde o bot roda - por isso é explícito, não
 		// `new Date()` cru.
-		zabbixTzOffsetMinutes: parseInt(process.env.MOD_ZABBIX_TZ_OFFSET_MINUTES ?? "0", 10),
+		zabbixTzOffsetMinutes: parseInt(
+			process.env.MOD_ZABBIX_TZ_OFFSET_MINUTES ?? "0",
+			10,
+		),
 		archiveDelayMs: parseInt(
 			process.env.MOD_ZABBIX_ARCHIVE_DELAY_MS ?? String(24 * 60 * 60_000),
 			10,
@@ -108,6 +111,10 @@ export const config = {
 	autobloqueador: {
 		url: process.env.MOD_AUTOBLOQUEADOR_URL,
 		token: process.env.MOD_AUTOBLOQUEADOR_TOKEN,
+	},
+	ixc: {
+		baseUrl: process.env.MOD_IXCSOFT_BASE_URL,
+		token: process.env.MOD_IXCSOFT_TOKEN, // "id:senha" cru - vira Basic em client.ts
 	},
 } as const;
 
