@@ -248,13 +248,20 @@ export async function installCogFromSource(
 // vez no boot (recalcular MOD_ZABBIX_RECONCILE_SINCE="start" de novo mudaria o corte pra "agora"),
 // e a classe do client em si (nunca reinstanciada, só existe por consistência de `instanceof`).
 // Ficam de fora da limpeza de cache do hotReloadBot - todo o resto de `src/` é resetado.
+//
+// Caminho RELATIVO de propósito, nunca alias `@/...` - `tsc-alias` (que reescreve os aliases pra
+// caminho relativo no build de produção) só reconhece `require("@/...")` puro; `require.resolve`
+// não bate no regex dele (confirmado lendo o pacote), então um alias aqui sobrevive cru no
+// `dist/` - funciona em dev (via tsconfig-paths) e quebra em produção com "Cannot find module
+// '@/config'" (bug real, já derrubou o bot em produção). Caminho relativo não depende de nenhuma
+// reescrita, funciona igual nos dois ambientes.
 const HOT_RELOAD_KEEP_ALIVE = [
-	"@/config",
-	"@/database/connection",
-	"@/utils/logging",
-	"@/utils/metrics",
-	"@/core/BotClient",
-].map((p) => require.resolve(p));
+	require.resolve("../config"),
+	require.resolve("../database/connection"),
+	require.resolve("../utils/logging"),
+	require.resolve("../utils/metrics"),
+	require.resolve("./BotClient"),
+];
 
 /**
  * Hot reload do bot inteiro: descarrega todos os cogs (para eles com o código atual, ainda em
