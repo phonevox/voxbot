@@ -6,7 +6,11 @@ WORKDIR /app
 # ---- all deps (dev + prod), needed to compile ----
 FROM base AS deps
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+# Cache mount (não é layer cache) - sobrevive mesmo quando o bun.lock muda, então só baixa de novo
+# o que realmente mudou no lockfile, não o lockfile inteiro. Mesmo id/path da stage prod-deps
+# abaixo, pra reusar os pacotes já baixados aqui em vez de baixar tudo de novo lá.
+RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun-install-cache \
+	bun install --frozen-lockfile
 
 # ---- compile TypeScript, rewrite @/ aliases to relative paths ----
 FROM base AS build
@@ -23,7 +27,8 @@ RUN bun run build
 # ---- production-only deps for the final image ----
 FROM base AS prod-deps
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun-install-cache \
+	bun install --frozen-lockfile --production
 
 # ---- runtime ----
 FROM node:20-alpine
