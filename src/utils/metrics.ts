@@ -24,6 +24,31 @@ function nsToMs(ns: number): number {
 	return Number.isFinite(ns) ? Math.round(ns / 1e5) / 10 : 0;
 }
 
+export interface EventLoopLagDetail {
+	minMs: number;
+	meanMs: number;
+	p50Ms: number;
+	p95Ms: number;
+	p99Ms: number;
+	maxMs: number;
+	stddevMs: number;
+}
+
+/** Versão "debug" de `getEventLoopLag` - mesmo histograma compartilhado (não cria um segundo monitor), só expõe mais percentis. Reseta o histograma igual, então não chame os dois de seguida esperando ver o mesmo período. */
+export function getEventLoopLagDetail(): EventLoopLagDetail {
+	const stats = {
+		minMs: nsToMs(eventLoopHistogram.min),
+		meanMs: nsToMs(eventLoopHistogram.mean),
+		p50Ms: nsToMs(eventLoopHistogram.percentile(50)),
+		p95Ms: nsToMs(eventLoopHistogram.percentile(95)),
+		p99Ms: nsToMs(eventLoopHistogram.percentile(99)),
+		maxMs: nsToMs(eventLoopHistogram.max),
+		stddevMs: nsToMs(eventLoopHistogram.stddev),
+	};
+	eventLoopHistogram.reset();
+	return stats;
+}
+
 export interface TickStats {
 	durationMs: number;
 	userCount: number;

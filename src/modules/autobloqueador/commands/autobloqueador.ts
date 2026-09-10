@@ -42,24 +42,40 @@ export default defineCommand({
 	// Permissão é uma lista própria (banco), não cargo/permissão do Discord - checado na mão em
 	// executeAsSlash/executeAsPrefix, mesmo padrão do cargo operador do zabbix.
 	options: new SlashCommandBuilder()
-		.addSubcommand((s) => s.setName("rechecar").setDescription("Força uma atualização do Auto-Bloqueador."))
+		.addSubcommand((s) =>
+			s
+				.setName("rechecar")
+				.setDescription("Força uma atualização do Auto-Bloqueador."),
+		)
 		.addSubcommand((s) =>
 			s
 				.setName("autorizar")
 				.setDescription("Autoriza alguém a usar este comando.")
-				.addUserOption((o) => o.setName("usuario").setDescription("Quem autorizar").setRequired(true)),
+				.addUserOption((o) =>
+					o
+						.setName("usuario")
+						.setDescription("Quem autorizar")
+						.setRequired(true),
+				),
 		)
 		.addSubcommand((s) =>
 			s
 				.setName("desautorizar")
 				.setDescription("Remove a autorização de alguém.")
-				.addUserOption((o) => o.setName("usuario").setDescription("Quem desautorizar").setRequired(true)),
+				.addUserOption((o) =>
+					o
+						.setName("usuario")
+						.setDescription("Quem desautorizar")
+						.setRequired(true),
+				),
 		),
 
 	async executeAsSlash(interaction, _client) {
 		if (!(await isAuthorized(interaction.user.id))) {
 			await interaction.reply({
-				embeds: [EmbedFormatter.error("Você não tem autorização pra usar esse comando.")],
+				...EmbedFormatter.error(
+					"Você não tem autorização pra usar esse comando.",
+				),
 				ephemeral: true,
 			});
 			return;
@@ -70,7 +86,7 @@ export default defineCommand({
 		if (sub === "rechecar") {
 			await interaction.deferReply();
 			const msg = await rechecar();
-			await interaction.editReply({ embeds: [EmbedFormatter.info(msg)] });
+			await interaction.editReply(EmbedFormatter.info(msg));
 			return;
 		}
 
@@ -79,11 +95,11 @@ export default defineCommand({
 		if (sub === "autorizar") {
 			const added = await addAuthorized(alvo.id, interaction.user.id);
 			await interaction.reply({
-				embeds: [
-					added
-						? EmbedFormatter.success(`${userMention(alvo.id)} autorizado.`)
-						: EmbedFormatter.warn(`${userMention(alvo.id)} já estava autorizado.`),
-				],
+				...(added
+					? EmbedFormatter.success(`${userMention(alvo.id)} autorizado.`)
+					: EmbedFormatter.warn(
+							`${userMention(alvo.id)} já estava autorizado.`,
+						)),
 				ephemeral: true,
 			});
 			return;
@@ -92,11 +108,11 @@ export default defineCommand({
 		if (sub === "desautorizar") {
 			const removed = await removeAuthorized(alvo.id);
 			await interaction.reply({
-				embeds: [
-					removed
-						? EmbedFormatter.success(`${userMention(alvo.id)} desautorizado.`)
-						: EmbedFormatter.warn(`${userMention(alvo.id)} não estava autorizado.`),
-				],
+				...(removed
+					? EmbedFormatter.success(`${userMention(alvo.id)} desautorizado.`)
+					: EmbedFormatter.warn(
+							`${userMention(alvo.id)} não estava autorizado.`,
+						)),
 				ephemeral: true,
 			});
 		}
@@ -104,7 +120,9 @@ export default defineCommand({
 
 	async executeAsPrefix(message, args, _client) {
 		if (!(await isAuthorized(message.author.id))) {
-			await message.reply({ embeds: [EmbedFormatter.error("Você não tem autorização pra usar esse comando.")] });
+			await message.reply(
+				EmbedFormatter.error("Você não tem autorização pra usar esse comando."),
+			);
 			return;
 		}
 
@@ -112,39 +130,43 @@ export default defineCommand({
 
 		if (sub === "rechecar") {
 			const msg = await rechecar();
-			await message.reply({ embeds: [EmbedFormatter.info(msg)] });
+			await message.reply(EmbedFormatter.info(msg));
 			return;
 		}
 
 		if (sub === "autorizar" || sub === "desautorizar") {
 			const alvo = await args.getUser("usuario");
 			if (!alvo) {
-				await message.reply({ embeds: [EmbedFormatter.warn(`Uso: \`!autobloqueador ${sub} @usuário\`.`)] });
+				await message.reply(
+					EmbedFormatter.warn(`Uso: \`!autobloqueador ${sub} @usuário\`.`),
+				);
 				return;
 			}
 
 			if (sub === "autorizar") {
 				const added = await addAuthorized(alvo.id, message.author.id);
-				await message.reply({
-					embeds: [
-						added
-							? EmbedFormatter.success(`${userMention(alvo.id)} autorizado.`)
-							: EmbedFormatter.warn(`${userMention(alvo.id)} já estava autorizado.`),
-					],
-				});
+				await message.reply(
+					added
+						? EmbedFormatter.success(`${userMention(alvo.id)} autorizado.`)
+						: EmbedFormatter.warn(
+								`${userMention(alvo.id)} já estava autorizado.`,
+							),
+				);
 			} else {
 				const removed = await removeAuthorized(alvo.id);
-				await message.reply({
-					embeds: [
-						removed
-							? EmbedFormatter.success(`${userMention(alvo.id)} desautorizado.`)
-							: EmbedFormatter.warn(`${userMention(alvo.id)} não estava autorizado.`),
-					],
-				});
+				await message.reply(
+					removed
+						? EmbedFormatter.success(`${userMention(alvo.id)} desautorizado.`)
+						: EmbedFormatter.warn(
+								`${userMention(alvo.id)} não estava autorizado.`,
+							),
+				);
 			}
 			return;
 		}
 
-		await message.reply({ embeds: [EmbedFormatter.warn("Use `rechecar`, `autorizar` ou `desautorizar`.")] });
+		await message.reply(
+			EmbedFormatter.warn("Use `rechecar`, `autorizar` ou `desautorizar`."),
+		);
 	},
 });

@@ -60,6 +60,13 @@ export const config = {
 			process.env.OWNER_IDS?.split(",")
 				.map((id) => id.trim())
 				.filter(Boolean) ?? [],
+
+		// Nomes de pasta em src/modules (ex: "zabbix,autobloqueador") - esses cogs são pulados no
+		// boot, nem chegam a ser importados. Pra desligar um módulo sem mexer em código/config dele.
+		disabledCogs:
+			process.env.DISABLED_COGS?.split(",")
+				.map((name) => name.trim())
+				.filter(Boolean) ?? [],
 	},
 	// Tudo opcional (undefined se não setado) - o cog zabbix é um módulo específico de uma
 	// integração, não algo que toda instalação do bot precisa ter configurado pra subir.

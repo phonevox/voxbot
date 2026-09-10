@@ -1,4 +1,8 @@
-import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import {
+	ChannelType,
+	PermissionFlagsBits,
+	SlashCommandBuilder,
+} from "discord.js";
 import { defineCommand } from "@/define";
 import { CommandCategory } from "@/types";
 import { channelMention, EmbedFormatter, userMention } from "@/utils/format";
@@ -35,7 +39,9 @@ export default defineCommand({
 				.addUserOption((opt) =>
 					opt
 						.setName("user")
-						.setDescription("De quem alterar o apelido (padrão: você mesmo). Requer Gerenciar Canais para outra pessoa."),
+						.setDescription(
+							"De quem alterar o apelido (padrão: você mesmo). Requer Gerenciar Canais para outra pessoa.",
+						),
 				)
 				.addStringOption((opt) =>
 					opt
@@ -74,7 +80,7 @@ export default defineCommand({
 	async executeAsSlash(interaction, _client) {
 		if (!interaction.guild) {
 			await interaction.reply({
-				embeds: [EmbedFormatter.error("Só funciona em servidores!")],
+				...EmbedFormatter.error("Só funciona em servidores!"),
 				ephemeral: true,
 			});
 			return;
@@ -83,7 +89,8 @@ export default defineCommand({
 		const guild = interaction.guild;
 		const sub = interaction.options.getSubcommand(true);
 		const hasManageChannels = () =>
-			interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) ?? false;
+			interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) ??
+			false;
 
 		if (sub === "apelido") {
 			const targetUser = interaction.options.getUser("user");
@@ -91,7 +98,9 @@ export default defineCommand({
 
 			if (!isSelf && !hasManageChannels()) {
 				await interaction.reply({
-					embeds: [EmbedFormatter.error("Você precisa da permissão **Gerenciar Canais** para alterar o apelido de outra pessoa.")],
+					...EmbedFormatter.error(
+						"Você precisa da permissão **Gerenciar Canais** para alterar o apelido de outra pessoa.",
+					),
 					ephemeral: true,
 				});
 				return;
@@ -99,8 +108,13 @@ export default defineCommand({
 
 			const name = interaction.options.getString("nome")?.trim();
 			const targetId = targetUser?.id ?? interaction.user.id;
-			const embed = await applyApelido(guild.id, targetId, name, isSelf ? undefined : targetUser.toString());
-			await interaction.reply({ embeds: [embed], ephemeral: true });
+			const reply = await applyApelido(
+				guild.id,
+				targetId,
+				name,
+				isSelf ? undefined : targetUser.toString(),
+			);
+			await interaction.reply({ ...reply, ephemeral: true });
 			return;
 		}
 
@@ -109,94 +123,118 @@ export default defineCommand({
 		// pro comando inteiro, não por subcomando), então checa aqui.
 		if (!hasManageChannels()) {
 			await interaction.reply({
-				embeds: [EmbedFormatter.error("Você precisa da permissão **Gerenciar Canais** para isso.")],
+				...EmbedFormatter.error(
+					"Você precisa da permissão **Gerenciar Canais** para isso.",
+				),
 				ephemeral: true,
 			});
 			return;
 		}
 
 		if (sub === "geradores") {
-			const embed = await buildGeneratorsEmbed(guild.id);
-			await interaction.reply({ embeds: [embed], ephemeral: true });
+			const reply = await buildGeneratorsEmbed(guild.id);
+			await interaction.reply({ ...reply, ephemeral: true });
 			return;
 		}
 
 		if (sub === "apelidos") {
-			const embed = await buildApelidosEmbed(guild.id);
-			await interaction.reply({ embeds: [embed], ephemeral: true });
+			const reply = await buildApelidosEmbed(guild.id);
+			await interaction.reply({ ...reply, ephemeral: true });
 			return;
 		}
 
 		const channel = interaction.options.getChannel("canal", true);
-		const embed = await toggleGenerator(guild.id, channel.id, channel.name ?? channel.id);
-		await interaction.reply({ embeds: [embed], ephemeral: true });
+		const reply = await toggleGenerator(
+			guild.id,
+			channel.id,
+			channel.name ?? channel.id,
+		);
+		await interaction.reply({ ...reply, ephemeral: true });
 	},
 
 	async executeAsPrefix(message, args, _client) {
 		if (!message.guild) {
-			await message.reply({ embeds: [EmbedFormatter.error("Só funciona em servidores!")] });
+			await message.reply(EmbedFormatter.error("Só funciona em servidores!"));
 			return;
 		}
 
 		const guild = message.guild;
 		const sub = args.getSubcommand();
 		const hasManageChannels = () =>
-			message.member?.permissions.has(PermissionFlagsBits.ManageChannels) ?? false;
+			message.member?.permissions.has(PermissionFlagsBits.ManageChannels) ??
+			false;
 
 		if (sub === "apelido") {
 			const targetUser = await args.getUser("user");
 			const isSelf = !targetUser || targetUser.id === message.author.id;
 
 			if (!isSelf && !hasManageChannels()) {
-				await message.reply({
-					embeds: [EmbedFormatter.error("Você precisa da permissão **Gerenciar Canais** para alterar o apelido de outra pessoa.")],
-				});
+				await message.reply(
+					EmbedFormatter.error(
+						"Você precisa da permissão **Gerenciar Canais** para alterar o apelido de outra pessoa.",
+					),
+				);
 				return;
 			}
 
 			const name = args.getString("nome")?.trim();
 			const targetId = targetUser?.id ?? message.author.id;
-			const embed = await applyApelido(guild.id, targetId, name, isSelf ? undefined : targetUser.toString());
-			await message.reply({ embeds: [embed] });
+			const reply = await applyApelido(
+				guild.id,
+				targetId,
+				name,
+				isSelf ? undefined : targetUser.toString(),
+			);
+			await message.reply(reply);
 			return;
 		}
 
 		if (sub === "geradores" || sub === "apelidos") {
 			if (!hasManageChannels()) {
-				await message.reply({
-					embeds: [EmbedFormatter.error("Você precisa da permissão **Gerenciar Canais** para isso.")],
-				});
+				await message.reply(
+					EmbedFormatter.error(
+						"Você precisa da permissão **Gerenciar Canais** para isso.",
+					),
+				);
 				return;
 			}
 
-			const embed =
-				sub === "geradores" ? await buildGeneratorsEmbed(guild.id) : await buildApelidosEmbed(guild.id);
-			await message.reply({ embeds: [embed] });
+			const reply =
+				sub === "geradores"
+					? await buildGeneratorsEmbed(guild.id)
+					: await buildApelidosEmbed(guild.id);
+			await message.reply(reply);
 			return;
 		}
 
 		if (sub === "gerador") {
 			if (!hasManageChannels()) {
-				await message.reply({
-					embeds: [EmbedFormatter.error("Você precisa da permissão **Gerenciar Canais** para isso.")],
-				});
+				await message.reply(
+					EmbedFormatter.error(
+						"Você precisa da permissão **Gerenciar Canais** para isso.",
+					),
+				);
 				return;
 			}
 
 			const channel = await args.getChannel("canal");
 			if (!channel || channel.type !== ChannelType.GuildVoice) {
-				await message.reply({ embeds: [EmbedFormatter.warn("Aponte para um canal de voz.")] });
+				await message.reply(
+					EmbedFormatter.warn("Aponte para um canal de voz."),
+				);
 				return;
 			}
 
-			const embed = await toggleGenerator(guild.id, channel.id, channel.name);
-			await message.reply({ embeds: [embed] });
+			const reply = await toggleGenerator(guild.id, channel.id, channel.name);
+			await message.reply(reply);
 			return;
 		}
 
-		await message.reply({
-			embeds: [EmbedFormatter.warn("Use `apelido`, `gerador`, `geradores` ou `apelidos`.")],
-		});
+		await message.reply(
+			EmbedFormatter.warn(
+				"Use `apelido`, `gerador`, `geradores` ou `apelidos`.",
+			),
+		);
 	},
 });
 
@@ -213,7 +251,9 @@ async function applyApelido(
 
 	if (!name) {
 		await clearApelido(guildId, userId);
-		return EmbedFormatter.success(`Resetado - ${subject} vão usar o nome padrão.`);
+		return EmbedFormatter.success(
+			`Resetado - ${subject} vão usar o nome padrão.`,
+		);
 	}
 
 	if (name.length > MAX_APELIDO_LENGTH) {
@@ -223,13 +263,21 @@ async function applyApelido(
 	}
 
 	await setApelido(guildId, userId, name);
-	return EmbedFormatter.success(`A partir de agora, ${subject} vão se chamar **${name}**.`);
+	return EmbedFormatter.success(
+		`A partir de agora, ${subject} vão se chamar **${name}**.`,
+	);
 }
 
-async function toggleGenerator(guildId: string, channelId: string, channelName: string) {
+async function toggleGenerator(
+	guildId: string,
+	channelId: string,
+	channelName: string,
+) {
 	if (await isGenerator(channelId)) {
 		await removeGenerator(channelId);
-		return EmbedFormatter.success(`**${channelName}** não é mais um canal gerador.`);
+		return EmbedFormatter.success(
+			`**${channelName}** não é mais um canal gerador.`,
+		);
 	}
 
 	await addGenerator(guildId, channelId);
@@ -241,7 +289,9 @@ async function toggleGenerator(guildId: string, channelId: string, channelName: 
 async function buildGeneratorsEmbed(guildId: string) {
 	const channelIds = await listGenerators(guildId);
 	if (!channelIds.length) {
-		return EmbedFormatter.info("Nenhum canal gerador configurado neste servidor.");
+		return EmbedFormatter.info(
+			"Nenhum canal gerador configurado neste servidor.",
+		);
 	}
 
 	const shown = channelIds.slice(0, MAX_LIST_ITEMS);
@@ -250,7 +300,9 @@ async function buildGeneratorsEmbed(guildId: string) {
 		lines.push(`... e mais ${channelIds.length - shown.length}.`);
 	}
 
-	return EmbedFormatter.info(`**Canais geradores (${channelIds.length}):**\n${lines.join("\n")}`);
+	return EmbedFormatter.info(
+		`**Canais geradores (${channelIds.length}):**\n${lines.join("\n")}`,
+	);
 }
 
 async function buildApelidosEmbed(guildId: string) {
@@ -265,5 +317,7 @@ async function buildApelidosEmbed(guildId: string) {
 		lines.push(`... e mais ${rows.length - shown.length}.`);
 	}
 
-	return EmbedFormatter.info(`**Apelidos (${rows.length}):**\n${lines.join("\n")}`);
+	return EmbedFormatter.info(
+		`**Apelidos (${rows.length}):**\n${lines.join("\n")}`,
+	);
 }

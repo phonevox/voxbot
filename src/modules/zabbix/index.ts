@@ -7,9 +7,13 @@ import _zabbix from "./commands/zabbix";
 import { handleZabbixButtons } from "./discord/buttons";
 import { handleOperatorMessage } from "./discord/operatorCommands";
 import { ensureSeverityTags } from "./discord/severity";
-import { startArchiveJob, stopArchiveJob } from "./jobs/archiver";
-import { reconcile, startReconciliationJob, stopReconciliationJob } from "./jobs/reconciliation";
 import { startIngestServer } from "./http/server";
+import { startArchiveJob, stopArchiveJob } from "./jobs/archiver";
+import {
+	reconcile,
+	startReconciliationJob,
+	stopReconciliationJob,
+} from "./jobs/reconciliation";
 import { ZABBIX_SCHEMA } from "./migrations";
 import * as repo from "./repository";
 
@@ -33,7 +37,8 @@ function isConfigured(): boolean {
 
 export default defineCog({
 	name: "zabbix",
-	description: "Ponte operacional entre o Zabbix e o Discord - 1 evento de trigger = 1 thread.",
+	description:
+		"Ponte operacional entre o Zabbix e o Discord - 1 evento de trigger = 1 thread.",
 	authors: [{ name: "masutty", id: 188851299255713792n }],
 
 	commands: [_zabbix],
@@ -41,7 +46,7 @@ export default defineCog({
 
 	events: {
 		// !ack/!finalizar/!sev viraram botões + select na primeira mensagem da thread (ver
-		// discord/buttons.ts) - só !mensagem continua também por texto, além do botão "Mensagem".
+		// discord/buttons.ts) - só !mensagem continua também por texto, além do botão "Interagir".
 		async interactionCreate(client, interaction) {
 			await handleZabbixButtons(client, interaction).catch((err) => {
 				logger.error(err instanceof Error ? err : new Error(String(err)));
@@ -69,7 +74,9 @@ export default defineCog({
 
 		// Cobre o caso do bot ter ficado fora do ar desde o último tick - reconcilia uma vez já no
 		// arranque, não só espera o primeiro intervalo.
-		reconcile(client).catch((err) => logger.error(err instanceof Error ? err : new Error(String(err))));
+		reconcile(client).catch((err) =>
+			logger.error(err instanceof Error ? err : new Error(String(err))),
+		);
 	},
 
 	async stop() {
