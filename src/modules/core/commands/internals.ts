@@ -10,11 +10,12 @@ import {
 import { join } from "path";
 import { config } from "@/config";
 import type { BotClient } from "@/core/BotClient";
-import { hotReloadBot, loadCog, reloadCog, unloadCog } from "@/core/CogLoader";
+import { hotReloadBot } from "@/core/CogLoader";
 import { registerSlashCommands } from "@/core/CommandHandler";
 import { getPoolStats, query } from "@/database/connection";
 import { defineCommand } from "@/define";
 import { CommandCategory } from "@/types";
+import { EmbedFormatter } from "@/utils/format";
 import {
 	getLogLevels,
 	LOG_LEVELS,
@@ -31,6 +32,16 @@ import {
 const logger = new Logger("core.commands.internals");
 const COGS_PATH = join(__dirname, "../../");
 
+// Subcomandos que MUDAM estado (ao contrário de "ping", "commands" etc, que só consultam) - só
+// esses merecem o ✅ verde de sucesso; o resto usa `EmbedFormatter.plain`, sem rotular uma leitura
+// como "sucesso".
+const MUTATING_SUBCOMMANDS = new Set([
+	"reload",
+	"log-set",
+	"slash-sync",
+	"shutdown",
+]);
+
 export default defineCommand({
 	name: "bot",
 	description: "Administração do bot.",
@@ -40,43 +51,6 @@ export default defineCommand({
 	showOnHelp: false,
 
 	options: new SlashCommandBuilder()
-		.addSubcommand((s) =>
-			s
-				.setName("cog-status")
-				.setDescription("Mostra se um cog está carregado.")
-				.addStringOption((o) =>
-					o.setName("name").setDescription("Nome do cog").setRequired(true),
-				),
-		)
-		.addSubcommand((s) =>
-			s
-				.setName("cog-load")
-				.setDescription("Carrega um cog.")
-				.addStringOption((o) =>
-					o.setName("name").setDescription("Nome do cog").setRequired(true),
-				),
-		)
-		.addSubcommand((s) =>
-			s
-				.setName("cog-unload")
-				.setDescription("Descarrega um cog.")
-				.addStringOption((o) =>
-					o.setName("name").setDescription("Nome do cog").setRequired(true),
-				),
-		)
-		.addSubcommand((s) =>
-			s
-				.setName("cog-reload")
-				.setDescription(
-					"Liga/religa um cog (se estiver off, carrega; se estiver on, descarrega e recarrega).",
-				)
-				.addStringOption((o) =>
-					o.setName("name").setDescription("Nome do cog").setRequired(true),
-				),
-		)
-		.addSubcommand((s) =>
-			s.setName("cogs").setDescription("Lista os cogs ativos e desativados."),
-		)
 		.addSubcommand((s) =>
 			s
 				.setName("reload")
@@ -178,7 +152,7 @@ export default defineCommand({
 		const routeKey = group ? `${group}-${sub}` : sub;
 
 		// Components V2 não convive com embed/content na mesma mensagem - resposta própria, fora
-		// do pipeline genérico de string -> successEmbed usado pelo resto dos subcomandos.
+		// do pipeline genérico de string -> EmbedFormatter usado pelo resto dos subcomandos.
 		if (routeKey === "status") {
 			await interaction.reply({
 				flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
@@ -193,17 +167,19 @@ export default defineCommand({
 			const result = await runSubcommand(
 				routeKey,
 				{
-					name: interaction.options.getString("name"),
 					level: interaction.options.getString("level"),
 					target: interaction.options.getString("target"),
 				},
 				client,
 			);
-			await interaction.editReply({ embeds: [successEmbed(result)] });
+			const formatted = MUTATING_SUBCOMMANDS.has(routeKey)
+				? EmbedFormatter.success(result)
+				: EmbedFormatter.plain(result);
+			await interaction.editReply(formatted);
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
 			logger.error(err instanceof Error ? err : new Error(msg));
-			await interaction.editReply({ embeds: [errorEmbed(msg)] });
+			await interaction.editReply(EmbedFormatter.error(msg));
 		}
 	},
 
@@ -229,17 +205,19 @@ export default defineCommand({
 			const result = await runSubcommand(
 				routeKey,
 				{
-					name: args.getString("name"),
 					level: args.getString("level"),
 					target: args.getString("target"),
 				},
 				client,
 			);
-			await message.reply({ embeds: [successEmbed(result)] });
+			const formatted = MUTATING_SUBCOMMANDS.has(routeKey)
+				? EmbedFormatter.success(result)
+				: EmbedFormatter.plain(result);
+			await message.reply(formatted);
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
 			logger.error(err instanceof Error ? err : new Error(msg));
-			await message.reply({ embeds: [errorEmbed(msg)] });
+			await message.reply(EmbedFormatter.error(msg));
 		}
 	},
 });
@@ -247,63 +225,16 @@ export default defineCommand({
 // ─── Shared logic ─────────────────────────────────────────────────────────────
 
 interface SubcommandArgs {
-	name: string | null;
 	level: string | null;
 	target: string | null;
 }
 
 async function runSubcommand(
 	sub: string,
-	{ name, level, target }: SubcommandArgs,
+	{ level, target }: SubcommandArgs,
 	client: BotClient,
 ): Promise<string> {
 	switch (sub) {
-		case "cog-status": {
-			if (!name) throw new Error("Nome do cog é obrigatório.");
-			const cog = client.cogs.get(name);
-			if (!cog) {
-				const disabled = config.bot.disabledCogs.includes(name);
-				return `Cog \`${name}\` não está carregado${disabled ? " (:warning: `DISABLED_COGS`)" : ""}.`;
-			}
-			return `Cog \`${cog.name}\` ativo - ${cog.commands?.length ?? 0} comando(s), ${Object.keys(cog.events ?? {}).length} evento(s).`;
-		}
-
-		case "cog-load":
-			if (!name) throw new Error("Nome do cog é obrigatório.");
-			await loadCog(client, COGS_PATH, name);
-			return `Cog \`${name}\` carregado.`;
-
-		case "cog-unload":
-			if (!name) throw new Error("Nome do cog é obrigatório.");
-			await unloadCog(client, name);
-			return `Cog \`${name}\` descarregado.`;
-
-		case "cog-reload": {
-			if (!name) throw new Error("Nome do cog é obrigatório.");
-			const wasLoaded = client.cogs.has(name);
-			if (wasLoaded) await reloadCog(client, COGS_PATH, name);
-			else await loadCog(client, COGS_PATH, name);
-			return `Cog \`${name}\` ${wasLoaded ? "recarregado (estava ativo)" : "carregado (estava inativo)"}.`;
-		}
-
-		case "cogs": {
-			const active = [...client.cogs.values()].map(
-				(c) =>
-					`- \`${c.name}\` - ${c.commands?.length ?? 0} comando(s), ${Object.keys(c.events ?? {}).length} evento(s)`,
-			);
-			const disabled = config.bot.disabledCogs.filter(
-				(n) => !client.cogs.has(n),
-			);
-			const lines = [`**Ativos (${client.cogs.size}):**`, ...active];
-			if (disabled.length) {
-				lines.push(
-					"",
-					`**Desativados (\`DISABLED_COGS\`):** ${disabled.map((n) => `\`${n}\``).join(", ")}`,
-				);
-			}
-			return lines.join("\n");
-		}
-
 		case "reload": {
 			const failures = await hotReloadBot(client, COGS_PATH);
 			const summary = `Bot recarregado: ${client.cogs.size} cog(s), ${client.commands.size} comando(s).`;
@@ -493,14 +424,9 @@ function usageEmbed(): EmbedBuilder {
 		.setTitle("🤖 Administração do Bot")
 		.addFields([
 			{
-				name: "Cogs",
-				value:
-					"`!bot cogs` - lista ativos/desativados\n`!bot cog-status <name>`\n`!bot cog-load <name>`\n`!bot cog-unload <name>`\n`!bot cog-reload <name>` - liga se tava off, religa se tava on",
-			},
-			{
 				name: "Bot",
 				value:
-					"`!bot reload` - hot reload do bot inteiro (código alterado em qualquer arquivo, sem reiniciar)\n`!bot slash-sync` - sincroniza slash commands\n`!bot status` - visão geral\n`!bot uptime` - só o tempo ativo\n`!bot invite` - link de convite\n`!bot shutdown` - desligamento gracioso",
+					"`!bot reload` - hot reload do bot inteiro (código alterado em qualquer arquivo, sem reiniciar)\n`!bot slash-sync` - sincroniza slash commands\n`!bot status` - visão geral\n`!bot uptime` - só o tempo ativo\n`!bot invite` - link de convite\n`!bot shutdown` - desligamento gracioso\n-# Gerenciar cogs individualmente (carregar/descarregar/instalar) é com `!dcl`, não aqui.",
 			},
 			{
 				name: "Debug (detalhe de cada linha do status)",
@@ -517,14 +443,6 @@ function usageEmbed(): EmbedBuilder {
 
 function formatMb(bytes: number): string {
 	return `${Math.round(bytes / 1024 / 1024)}MB`;
-}
-
-function successEmbed(msg: string): EmbedBuilder {
-	return new EmbedBuilder().setColor(0x57f287).setDescription(`✅ ${msg}`);
-}
-
-function errorEmbed(msg: string): EmbedBuilder {
-	return new EmbedBuilder().setColor(0xff0000).setDescription(`❌ ${msg}`);
 }
 
 function formatUptime(seconds: number): string {

@@ -1,14 +1,11 @@
-import type {
-	APIEmbed,
-	APIMessageTopLevelComponent,
-	Message,
-} from "discord.js";
+import type { APIEmbed, APIMessageTopLevelComponent } from "discord.js";
 import { MessageFlags } from "discord.js";
 import { config } from "@/config";
 import { getGuildPrefix } from "@/database/guildRepository";
 import { defineCommand } from "@/define";
 import { CommandCategory } from "@/types";
 import { EmbedFormatter, extractCodeBlock } from "@/utils/format";
+import { resolveMessageSource } from "@/utils/messageSource";
 
 interface EmbedPayload {
 	content?: string;
@@ -33,43 +30,6 @@ function usesComponentsV2(components: unknown[]): boolean {
 			(Array.isArray(nested) && usesComponentsV2(nested))
 		);
 	});
-}
-
-/** Baixa o primeiro anexo da mensagem, se tiver um - pra JSON grande demais pra caber inline. */
-async function fetchAttachmentJson(msg: Message): Promise<string | null> {
-	const attachment = msg.attachments.first();
-	if (!attachment) return null;
-
-	const res = await fetch(attachment.url);
-	if (!res.ok) throw new Error(`Falha ao baixar o anexo (HTTP ${res.status}).`);
-	return res.text();
-}
-
-/**
- * Resolve de onde vem o JSON: anexo na própria mensagem primeiro, depois o texto da mensagem (cru
- * ou em bloco de código), depois - se nenhum dos dois - a mensagem respondida (anexo dela ou
- * texto dela), na mesma ordem.
- */
-async function resolveSource(
-	message: Message,
-	prefixPattern: RegExp,
-): Promise<string> {
-	const ownAttachment = await fetchAttachmentJson(message);
-	if (ownAttachment !== null) return ownAttachment;
-
-	const ownText = message.content.replace(prefixPattern, "").trim();
-	if (ownText) return ownText;
-
-	if (!message.reference?.messageId) return "";
-	const replied = await message.channel.messages
-		.fetch(message.reference.messageId)
-		.catch(() => null);
-	if (!replied) return "";
-
-	const repliedAttachment = await fetchAttachmentJson(replied);
-	if (repliedAttachment !== null) return repliedAttachment;
-
-	return replied.content.replace(prefixPattern, "").trim();
 }
 
 function parsePayload(raw: string): EmbedPayload {
@@ -117,7 +77,7 @@ export default defineCommand({
 
 		let source: string;
 		try {
-			source = await resolveSource(message, embedPrefixPattern);
+			source = await resolveMessageSource(message, embedPrefixPattern);
 		} catch (err) {
 			await message.reply(
 				EmbedFormatter.error(err instanceof Error ? err.message : String(err)),

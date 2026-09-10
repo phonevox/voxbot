@@ -1,8 +1,18 @@
-import type { Client, Message } from "discord.js";
-import { EmbedBuilder } from "discord.js";
+import type {
+	ActionRowBuilder,
+	ButtonBuilder,
+	Client,
+	Message,
+} from "discord.js";
+import {
+	ContainerBuilder,
+	MessageFlags,
+	SeparatorSpacingSize,
+} from "discord.js";
 import { config } from "@/config";
 import { EmbedFormatter } from "@/utils/format";
 import { Logger } from "@/utils/logging";
+import { attachPagination, buildPaginationRow } from "@/utils/pagination";
 import * as repo from "../repository";
 import type { ZbxEventRow } from "../types";
 import {
@@ -15,6 +25,7 @@ import {
 	acknowledge,
 	getEventDetails,
 	getTriggerDescriptions,
+	type ZabbixEventDetails,
 } from "../zabbix/client";
 import { hasOperatorRole } from "./permissions";
 import { clampSeverity, severityColor, severityName } from "./severity";
@@ -41,7 +52,7 @@ const SEV_PATTERN = /^!sev\b\s*([0-5])\s*(.*)$/is;
 const ACOES_PATTERN = /^!zabbix\s+acoes\b/is;
 const DETALHES_PATTERN = /^!zabbix\s+detalhes\b|^!detalhes\b/is;
 
-const MAX_HISTORY_ENTRIES = 10;
+const HISTORY_PER_PAGE = 5;
 
 async function handleMensagem(
 	message: Message,
@@ -189,6 +200,96 @@ async function handleAcoes(
 	});
 }
 
+type DetalhesReply = {
+	flags: MessageFlags.IsComponentsV2;
+	components: (ContainerBuilder | ActionRowBuilder<ButtonBuilder>)[];
+};
+
+/**
+ * Componente único: estado do evento (host/severidade/status/etc) + separador + uma página do
+ * histórico de acks/comentários - paginado (`HISTORY_PER_PAGE` por página) em vez do corte fixo
+ * "últimos N" de antes, que simplesmente escondia entradas mais antigas sem jeito de ver o resto.
+ */
+function buildDetalhesReply(
+	details: ZabbixEventDetails,
+	event: ZbxEventRow,
+	description: string | undefined,
+	page: number,
+	interactive: boolean,
+): DetalhesReply {
+	const severity = clampSeverity(details.severity);
+	const host = details.hosts[0]?.name ?? "desconhecido";
+	const resolved = details.value === "0";
+
+	const infoLines = [
+		`**Host:** ${host}`,
+		`**Severidade:** ${severityName(severity)}`,
+		`**Status:** ${resolved ? "Resolvido" : details.acknowledged === "1" ? "Reconhecido" : "Aberto"}`,
+		event.owner_discord_id
+			? `**Responsável (Discord):** <@${event.owner_discord_id}>`
+			: "",
+		isResolved(details.opdata)
+			? `**Dados operacionais:** ${details.opdata}`
+			: "",
+		isResolved(description) ? `**Descrição:** ${description}` : "",
+		`**Aberto:** <t:${details.clock}:f>`,
+		resolved && details.r_clock !== "0"
+			? `**Resolvido:** <t:${details.r_clock}:f>`
+			: "",
+	].filter(Boolean);
+
+	const sorted = [...(details.acknowledges ?? [])].sort(
+		(a, b) => Number(a.clock) - Number(b.clock),
+	);
+	const pages = Math.max(1, Math.ceil(sorted.length / HISTORY_PER_PAGE));
+	const clampedPage = Math.min(page, pages - 1);
+	const slice = sorted.slice(
+		clampedPage * HISTORY_PER_PAGE,
+		(clampedPage + 1) * HISTORY_PER_PAGE,
+	);
+	const historyLines =
+		sorted.length === 0
+			? ["Nenhum comentário/ack registrado ainda."]
+			: slice.map(
+					(ack) =>
+						`- <t:${ack.clock}:R> (${describeAckAction(Number(ack.action))}): ${ack.message || "_sem texto_"}`,
+				);
+
+	const container = new ContainerBuilder().setAccentColor(
+		severityColor(severity),
+	);
+	container.addTextDisplayComponents((td) =>
+		td.setContent(`## ${details.name}`),
+	);
+	container.addSeparatorComponents((sep) =>
+		sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+	);
+	container.addTextDisplayComponents((td) =>
+		td.setContent(infoLines.join("\n")),
+	);
+	container.addSeparatorComponents((sep) =>
+		sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+	);
+	container.addTextDisplayComponents((td) =>
+		td.setContent(
+			`**Histórico (${sorted.length}):**\n${historyLines.join("\n")}`,
+		),
+	);
+	if (pages > 1) {
+		// V2 não tem footer de embed - isso faz as vezes dele.
+		container.addTextDisplayComponents((td) =>
+			td.setContent(`-# Página ${clampedPage + 1} de ${pages}`),
+		);
+	}
+
+	const components: DetalhesReply["components"] = [container];
+	if (interactive && sorted.length > HISTORY_PER_PAGE) {
+		components.push(buildPaginationRow(clampedPage, pages));
+	}
+
+	return { flags: MessageFlags.IsComponentsV2, components };
+}
+
 /** Sem checagem de cargo - é só leitura, não muda nada no Zabbix. */
 async function handleDetalhes(
 	message: Message,
@@ -211,60 +312,18 @@ async function handleDetalhes(
 		return;
 	}
 
-	const severity = clampSeverity(details.severity);
-	const host = details.hosts[0]?.name ?? "desconhecido";
 	const description = triggerDescriptions.get(event.zabbix_trigger_id);
-	const resolved = details.value === "0";
+	const pages = Math.max(
+		1,
+		Math.ceil((details.acknowledges ?? []).length / HISTORY_PER_PAGE),
+	);
+	const render = (page: number, interactive: boolean) =>
+		buildDetalhesReply(details, event, description, page, interactive);
 
-	const infoLines = [
-		`**Host:** ${host}`,
-		`**Severidade:** ${severityName(severity)}`,
-		`**Status:** ${resolved ? "Resolvido" : details.acknowledged === "1" ? "Reconhecido" : "Aberto"}`,
-		event.owner_discord_id
-			? `**Responsável (Discord):** <@${event.owner_discord_id}>`
-			: "",
-		isResolved(details.opdata)
-			? `**Dados operacionais:** ${details.opdata}`
-			: "",
-		isResolved(description) ? `**Descrição:** ${description}` : "",
-		`**Aberto:** <t:${details.clock}:f>`,
-		resolved && details.r_clock !== "0"
-			? `**Resolvido:** <t:${details.r_clock}:f>`
-			: "",
-	].filter(Boolean);
+	const sent = await message.reply(render(0, pages > 1));
+	if (pages <= 1) return;
 
-	const embed = new EmbedBuilder()
-		.setColor(severityColor(severity))
-		.setTitle(details.name)
-		.setDescription(infoLines.join("\n"));
-
-	const acknowledges = details.acknowledges ?? [];
-	if (acknowledges.length === 0) {
-		embed.addFields({
-			name: "Histórico",
-			value: "Nenhum comentário/ack registrado ainda.",
-		});
-	} else {
-		const sorted = [...acknowledges].sort(
-			(a, b) => Number(a.clock) - Number(b.clock),
-		);
-		const shown = sorted.slice(-MAX_HISTORY_ENTRIES);
-		const lines = shown.map(
-			(ack) =>
-				`- <t:${ack.clock}:R> (${describeAckAction(Number(ack.action))}): ${ack.message || "_sem texto_"}`,
-		);
-		if (sorted.length > shown.length) {
-			lines.unshift(
-				`_...${sorted.length - shown.length} entrada(s) mais antiga(s) omitida(s)_`,
-			);
-		}
-		embed.addFields({
-			name: `Histórico (${sorted.length})`,
-			value: lines.join("\n").slice(0, 1024),
-		});
-	}
-
-	await message.reply({ embeds: [embed] });
+	attachPagination(sent, { invokerId: message.author.id, pages, render });
 }
 
 export async function handleOperatorMessage(

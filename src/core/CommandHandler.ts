@@ -1,6 +1,5 @@
 import {
 	type ChatInputCommandInteraction,
-	EmbedBuilder,
 	Events,
 	type GuildMember,
 	type Message,
@@ -10,7 +9,7 @@ import {
 } from "discord.js";
 import { config } from "@/config";
 import { getGuildPrefix } from "@/database/guildRepository";
-import type { CommandDefinition } from "@/types";
+import { EmbedFormatter } from "@/utils/format";
 import { Logger } from "@/utils/logging";
 import { getFailureQuip } from "@/utils/quips";
 import type { BotClient } from "./BotClient";
@@ -90,11 +89,9 @@ export function registerCommandHandlers(client: BotClient): void {
 			);
 			if (guardError) {
 				await message
-					.reply({
-						embeds: [
-							errorEmbed("Erro! " + getFailureQuip() + "\n" + guardError),
-						],
-					})
+					.reply(
+						EmbedFormatter.error(`Erro! ${getFailureQuip()}\n${guardError}`),
+					)
 					.catch(() => {});
 				return;
 			}
@@ -104,7 +101,7 @@ export function registerCommandHandlers(client: BotClient): void {
 				command: commandName,
 			});
 			await message
-				.reply({ embeds: [errorEmbed(getFailureQuip())] })
+				.reply(EmbedFormatter.error(getFailureQuip()))
 				.catch(() => {});
 		}
 	});
@@ -141,7 +138,7 @@ export function registerCommandHandlers(client: BotClient): void {
 			);
 			if (guardError) {
 				const payload = {
-					embeds: [errorEmbed("Erro! " + getFailureQuip() + "\n" + guardError)],
+					...EmbedFormatter.error(`Erro! ${getFailureQuip()}\n${guardError}`),
 					ephemeral: true,
 				};
 				await interaction.reply(payload).catch(() => {});
@@ -154,7 +151,7 @@ export function registerCommandHandlers(client: BotClient): void {
 			});
 
 			const payload = {
-				embeds: [errorEmbed(getFailureQuip())],
+				...EmbedFormatter.error(getFailureQuip()),
 				ephemeral: true,
 			};
 			if (interaction.replied || interaction.deferred) {
@@ -195,10 +192,4 @@ export async function registerSlashCommands(
 		slashLogger.error(err instanceof Error ? err : new Error(String(err)));
 		throw err;
 	}
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function errorEmbed(msg: string): EmbedBuilder {
-	return new EmbedBuilder().setColor(0xff0000).setDescription(`❌ ${msg}`);
 }

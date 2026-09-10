@@ -1,5 +1,12 @@
 import { Events } from "discord.js";
-import { readdirSync, statSync } from "fs";
+import {
+	mkdirSync,
+	readdirSync,
+	renameSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "fs";
 import { join } from "path";
 import { config } from "@/config";
 import { runModuleMigrations } from "@/database/migrate";
@@ -14,6 +21,12 @@ const cogListeners = new Map<
 	string,
 	Array<{ event: string; handler: Function }>
 >();
+
+// De qual diretório-base cada cog carregado veio (`cogsPath` de verdade OU o sandbox do DCL) -
+// `reloadCog`/`installCogFromSource` consultam isso pra saber de onde reler, mesmo quando o
+// caller (ex: `!dcl reload <nome>`) só conhece o `cogsPath` real e não faz ideia de que aquele
+// cog específico é runtime-only.
+const cogOrigin = new Map<string, string>();
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -87,9 +100,15 @@ export async function loadCog(
 	const imported = require(fullPath);
 	const cog: Cog = imported.default ?? imported;
 
+	cogOrigin.set(cog.name, cogsPath);
 	await registerCog(client, cog);
 	logger.info(`Cog carregado: ${cog.name}`);
 	return cog;
+}
+
+/** De qual diretório-base um cog foi carregado - `undefined` se nunca foi carregado nesta sessão. */
+export function getCogOrigin(cogName: string): string | undefined {
+	return cogOrigin.get(cogName);
 }
 
 /**
@@ -119,7 +138,9 @@ export async function unloadCog(
 }
 
 /**
- * Recarrega um cog (unload + load do disco).
+ * Recarrega um cog (unload + load do disco). Usa `getCogOrigin(cogName)` em vez de confiar cegamente
+ * no `cogsPath` recebido - um cog instalado via `!dcl run` mora no sandbox do DCL, não em
+ * `cogsPath`, e quem chama `reloadCog` (ex: `!dcl reload <nome>`) não tem como saber disso.
  */
 export async function reloadCog(
 	client: BotClient,
@@ -129,9 +150,96 @@ export async function reloadCog(
 	if (!client.cogs.has(cogName))
 		throw new Error(`Cog "${cogName}" não está carregado.`);
 
+	const basePath = cogOrigin.get(cogName) ?? cogsPath;
 	await unloadCog(client, cogName);
-	await loadCog(client, cogsPath, cogName);
+	await loadCog(client, basePath, cogName);
 	logger.info(`Cog recarregado: ${cogName}`);
+}
+
+export interface InstallCogResult {
+	name: string;
+	commands: number;
+	/** true = já havia um cog com esse nome carregado em memória e ele foi substituído (não apagado). */
+	overwritten: boolean;
+}
+
+const DCL_RUNTIME_DIRNAME = ".dcl-runtime";
+
+/**
+ * Diretório sandbox dos cogs instalados via `!dcl run` - IRMÃO de `cogsPath` (`src/modules`), não
+ * filho dele, de propósito: `readdirSync(cogsPath)` (usado por `loadCogs`/`hotReloadBot` pra
+ * reescanear tudo) nunca lista o que está aqui dentro. Isso é o que garante que um cog instalado
+ * via DCL nunca "gruda" - some completamente num full reload ou restart do processo, sem exigir
+ * nenhuma lista de exclusão.
+ */
+export function getDclRuntimeDir(cogsPath: string): string {
+	return join(cogsPath, "..", DCL_RUNTIME_DIRNAME);
+}
+
+/**
+ * Instala/atualiza um cog em RUNTIME a partir do código-fonte de um `index.ts` só (`!dcl run`) -
+ * SEMPRE dentro do sandbox de `getDclRuntimeDir`, NUNCA em `cogsPath` (`src/modules`) de verdade.
+ *
+ * Escreve num diretório de staging (dentro do próprio sandbox) e EXIGE (não confia em
+ * regex/texto) que `require()` + `defineCog()` realmente produzam um Cog válido antes de tocar em
+ * qualquer estado do bot - se o require falhar (erro de sintaxe, sem `export default`, o que
+ * for), nada do que já estava rodando é afetado, o staging é apagado e o erro sobe pro caller.
+ *
+ * "Overwrite" (`cog.name` já carregado, mesmo que seja um cog de verdade do repositório - zabbix,
+ * core, etc) SÓ troca o que está em MEMÓRIA (`unloadCog` - remove comandos/listeners, não mexe em
+ * arquivo nenhum). O `index.ts` real em `src/modules/<nome>`, se existir, NUNCA é lido, movido ou
+ * apagado por esta função - ele continua exatamente como estava. Um full reload (`!bot reload`)
+ * ou reiniciar o processo volta a carregar esse cog real do disco normalmente; a versão instalada
+ * via DCL é esquecida (o sandbox inteiro é limpo no boot, ver `src/index.ts`).
+ */
+export async function installCogFromSource(
+	client: BotClient,
+	cogsPath: string,
+	source: string,
+): Promise<InstallCogResult> {
+	const runtimeDir = getDclRuntimeDir(cogsPath);
+	const stagingDir = join(runtimeDir, ".staging");
+	const stagingIndex = join(stagingDir, "index");
+
+	rmSync(stagingDir, { recursive: true, force: true });
+	mkdirSync(stagingDir, { recursive: true });
+	writeFileSync(`${stagingIndex}.ts`, source, "utf8");
+
+	let cog: Cog;
+	try {
+		clearRequireCache(stagingIndex);
+		const imported = require(stagingIndex);
+		cog = imported.default ?? imported;
+	} catch (err) {
+		rmSync(stagingDir, { recursive: true, force: true });
+		throw err;
+	}
+
+	if (!cog || typeof cog.name !== "string" || !cog.name) {
+		rmSync(stagingDir, { recursive: true, force: true });
+		throw new Error(
+			'O arquivo não exportou um Cog válido - precisa de `export default defineCog({ name: "...", ... })`.',
+		);
+	}
+
+	// Só em memória - o cog real em `cogsPath` (se o nome colidir com um) não é tocado.
+	const overwritten = client.cogs.has(cog.name);
+	if (overwritten) await unloadCog(client, cog.name);
+
+	// Só dentro do sandbox - nunca em `cogsPath`.
+	const finalDir = join(runtimeDir, cog.name);
+	rmSync(finalDir, { recursive: true, force: true });
+	renameSync(stagingDir, finalDir);
+
+	const loaded = await loadCog(client, runtimeDir, cog.name);
+	logger.info(
+		`Cog instalado via DCL (runtime, ${runtimeDir}): ${loaded.name}${overwritten ? " (sobrescreveu a versão em memória)" : ""}`,
+	);
+	return {
+		name: loaded.name,
+		commands: loaded.commands?.length ?? 0,
+		overwritten,
+	};
 }
 
 // Arquivos com estado vivo que NÃO pode ser reinstanciado por baixo de quem já segura a

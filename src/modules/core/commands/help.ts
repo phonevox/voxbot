@@ -1,16 +1,9 @@
-import {
-	ActionRowBuilder,
-	ButtonBuilder,
-	ButtonStyle,
-	ComponentType,
-	EmbedBuilder,
-	type Message,
-	SlashCommandBuilder,
-} from "discord.js";
+import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import type { BotClient } from "@/core/BotClient";
 import { defineCommand } from "@/define";
 import { CommandCategory, type CommandDefinition } from "@/types";
 import { Logger } from "@/utils/logging";
+import { attachPagination, buildPaginationRow } from "@/utils/pagination";
 import { config } from "../../../config";
 import { getGuildPrefix } from "../../../database/guildRepository";
 
@@ -45,22 +38,17 @@ function buildEmbed(
 		);
 }
 
-function buildRow(
+function renderList(
 	page: number,
+	interactive: boolean,
+	all: CommandDefinition[],
 	pages: number,
-): ActionRowBuilder<ButtonBuilder> {
-	return new ActionRowBuilder<ButtonBuilder>().addComponents(
-		new ButtonBuilder()
-			.setCustomId("prev")
-			.setEmoji("◀️")
-			.setStyle(ButtonStyle.Secondary)
-			.setDisabled(page === 0),
-		new ButtonBuilder()
-			.setCustomId("next")
-			.setEmoji("▶️")
-			.setStyle(ButtonStyle.Secondary)
-			.setDisabled(page === pages - 1),
-	);
+	prefix: string,
+) {
+	return {
+		embeds: [buildEmbed(page, all, pages, prefix)],
+		components: interactive ? [buildPaginationRow(page, pages)] : [],
+	};
 }
 
 const ARG_TYPES = [3, 4, 5, 6, 7, 8, 10];
@@ -318,31 +306,17 @@ export default defineCommand({
 		const pages = Math.ceil(all.length / PER_PAGE);
 
 		await interaction.deferReply();
-		const msg = await interaction.editReply({
-			embeds: [buildEmbed(0, all, pages, prefix)],
-			components: pages > 1 ? [buildRow(0, pages)] : [],
-		});
+		const msg = await interaction.editReply(
+			renderList(0, pages > 1, all, pages, prefix),
+		);
 
 		if (pages <= 1) return;
 
-		let page = 0;
-		const collector = msg.createMessageComponentCollector({
-			componentType: ComponentType.Button,
-			time: 60_000,
-		});
-
-		collector.on("collect", async (i) => {
-			if (i.user.id !== interaction.user.id) return;
-			if (i.customId === "prev" && page > 0) page--;
-			if (i.customId === "next" && page < pages - 1) page++;
-			await i.update({
-				embeds: [buildEmbed(page, all, pages, prefix)],
-				components: [buildRow(page, pages)],
-			});
-		});
-
-		collector.on("end", async () => {
-			await interaction.editReply({ components: [] }).catch(() => {});
+		attachPagination(msg, {
+			invokerId: interaction.user.id,
+			pages,
+			render: (page, interactive) =>
+				renderList(page, interactive, all, pages, prefix),
 		});
 	},
 
@@ -378,38 +352,17 @@ export default defineCommand({
 		const all = getVisibleCommands(client);
 		const pages = Math.ceil(all.length / PER_PAGE);
 
-		let page = 0;
-		const sent = await message.reply({
-			embeds: [buildEmbed(0, all, pages, prefix)],
-			components: pages > 1 ? [buildRow(0, pages)] : [],
-		});
+		const sent = await message.reply(
+			renderList(0, pages > 1, all, pages, prefix),
+		);
 
 		if (pages <= 1) return;
 
-		const collector = sent.createMessageComponentCollector({
-			componentType: ComponentType.Button,
-			time: 60_000,
-		});
-
-		collector.on("collect", async (i) => {
-			// Só quem chamou o comando originalmente pode paginar
-			if (i.user.id !== message.author.id) {
-				await i.reply({
-					content: "Esses botões não são seus!",
-					ephemeral: true,
-				});
-				return;
-			}
-			if (i.customId === "prev" && page > 0) page--;
-			if (i.customId === "next" && page < pages - 1) page++;
-			await i.update({
-				embeds: [buildEmbed(page, all, pages, prefix)],
-				components: [buildRow(page, pages)],
-			});
-		});
-
-		collector.on("end", async () => {
-			await sent.edit({ components: [] }).catch(() => {});
+		attachPagination(sent, {
+			invokerId: message.author.id,
+			pages,
+			render: (page, interactive) =>
+				renderList(page, interactive, all, pages, prefix),
 		});
 	},
 });

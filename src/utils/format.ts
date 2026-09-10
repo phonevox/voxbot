@@ -54,14 +54,15 @@ export interface FormattedReplyOptions {
 }
 
 function statusReply(
-	accent: number,
-	emoji: string,
+	accent: number | undefined,
+	emoji: string | null,
 	msg: string,
 	{ emoji: showEmoji = true }: FormattedReplyOptions = {},
 ): FormattedReply {
-	const container = new ContainerBuilder().setAccentColor(accent);
-	if (showEmoji)
-		container.addTextDisplayComponents((td) => td.setContent(emoji));
+	const container = new ContainerBuilder();
+	if (accent !== undefined) container.setAccentColor(accent);
+	if (emoji && showEmoji)
+		container.addTextDisplayComponents((td) => td.setContent(`-# ${emoji}`));
 	container.addTextDisplayComponents((td) => td.setContent(msg));
 	return { components: [container], flags: MessageFlags.IsComponentsV2 };
 }
@@ -75,6 +76,9 @@ export const EmbedFormatter = {
 		statusReply(0x5865f2, "ℹ️", msg, options),
 	warn: (msg: string, options?: FormattedReplyOptions) =>
 		statusReply(0xffff00, "⚠️", msg, options),
+	/** Sem cor, sem emoji - pra leitura pura (uma listagem, um dado consultado), quando não faz
+	 * sentido rotular como sucesso/erro/aviso/informação. */
+	plain: (msg: string): FormattedReply => statusReply(undefined, null, msg),
 };
 
 export function roleMention(id: string): string {
