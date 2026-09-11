@@ -75,11 +75,16 @@ function buildJumpModal(pages: number): ModalBuilder {
 		);
 }
 
+/** Modal de "ir pra página" tem seu próprio prazo pra digitar - não deve encolher junto com o
+ * idle timeout dos botões (que agora costuma ser bem mais curto). */
+const MODAL_TIMEOUT_MS = 60_000;
+
 export interface AttachPaginationOptions {
 	/** Só cliques desse usuário são aceitos - todo o resto recebe "não são seus" efêmero. */
 	invokerId: string;
 	pages: number;
-	/** Padrão 60s, igual ao resto dos menus interativos do bot. */
+	/** Timeout OCIOSO (não absoluto) - cada clique reseta a contagem. Padrão 20s: enquanto o
+	 * usuário estiver navegando os botões continuam vivos, só somem depois de ficar parado. */
 	timeoutMs?: number;
 	/**
 	 * Recalcula o payload inteiro (`embeds`+`components` clássico OU `flags`+`components` V2) pra
@@ -96,12 +101,12 @@ export function attachPagination(
 	msg: Message,
 	opts: AttachPaginationOptions,
 ): void {
-	const { pages, invokerId, render, timeoutMs = 60_000 } = opts;
+	const { pages, invokerId, render, timeoutMs = 20_000 } = opts;
 	let page = 0;
 
 	const collector = msg.createMessageComponentCollector({
 		componentType: ComponentType.Button,
-		time: timeoutMs,
+		idle: timeoutMs,
 	});
 
 	collector.on("collect", async (i) => {
@@ -142,7 +147,7 @@ export function attachPagination(
 		await i.showModal(modal);
 		const submitted = await i
 			.awaitModalSubmit({
-				time: timeoutMs,
+				time: MODAL_TIMEOUT_MS,
 				filter: (m) => m.customId === modal.data.custom_id,
 			})
 			.catch(() => null);
