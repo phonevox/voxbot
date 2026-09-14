@@ -254,6 +254,16 @@ export class PrefixArgs {
 		);
 	}
 
+	/**
+	 * Tokens brutos restantes (pós subcomando), sem resolver contra o schema. Para comandos que
+	 * misturam texto livre com um parâmetro opcional posicional - o schema derivado só sabe
+	 * fazer o ÚLTIMO campo guloso, o que não dá conta de "mensagem livre + canal opcional no
+	 * fim" (ver stickymessage `add`/`edit`, docs/adr/0003).
+	 */
+	getRawArgs(): string[] {
+		return this.activeRaw;
+	}
+
 	async getRole(name: string): Promise<Role | null> {
 		const raw = this.getRaw(name);
 		if (!raw || !this.guild) return null;
