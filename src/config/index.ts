@@ -116,6 +116,11 @@ export const config = {
 		baseUrl: process.env.MOD_IXCSOFT_BASE_URL,
 		token: process.env.MOD_IXCSOFT_TOKEN, // "id:senha" cru - vira Basic em client.ts
 	},
+	hostinger: {
+		// developers.hostinger.com é o host de verdade da API (não api.hostinger.com, que não
+		// resolve) - confirmado ao vivo, não só pela doc.
+		apiToken: process.env.MOD_HOSTINGER_TOKEN,
+	},
 } as const;
 
 export type Config = typeof config;
