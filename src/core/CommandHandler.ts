@@ -106,6 +106,24 @@ export function registerCommandHandlers(client: BotClient): void {
 		}
 	});
 
+	// ── Autocomplete ──────────────────────────────────────────────────────────
+	client.on(Events.InteractionCreate, async (interaction) => {
+		if (!interaction.isAutocomplete()) return;
+
+		const command = client.commands.get(interaction.commandName);
+		const handler = command?.executeAutocomplete;
+		if (!handler) return;
+
+		try {
+			await handler(interaction, client);
+		} catch (err) {
+			logger.error(err instanceof Error ? err : new Error(String(err)), {
+				command: interaction.commandName,
+			});
+			await interaction.respond([]).catch(() => {});
+		}
+	});
+
 	// ── Slash ─────────────────────────────────────────────────────────────────
 	client.on(Events.InteractionCreate, async (interaction) => {
 		if (!interaction.isChatInputCommand()) return;

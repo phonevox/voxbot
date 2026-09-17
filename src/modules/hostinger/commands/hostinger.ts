@@ -6,12 +6,15 @@ import {
 } from "discord.js";
 import { defineCommand } from "@/define";
 import { CommandCategory } from "@/types";
+import { type ConfirmField, confirmAction } from "@/utils/confirm";
 import { EmbedFormatter, formatCodeblock, userMention } from "@/utils/format";
 import { attachPagination, buildPaginationRow } from "@/utils/pagination";
 import {
 	deleteZoneRecord,
 	getZoneRecords,
 	type HostingerZoneEntry,
+	listDomains,
+	resolveDomain,
 	upsertZoneRecord,
 } from "../api";
 import {
@@ -33,6 +36,27 @@ const NO_PERM_MSG =
  * decide (ver src/modules/hostinger/permissions.ts). Mesma ideia do `isAdmin` manual do
  * !zabbix (src/modules/zabbix/commands/zabbix.ts): cada subcomando sensível checa na mão.
  */
+
+// Lista fechada pro <select> de tipo do slash (`.addChoices`) e pra validar o `tipo` digitado
+// via prefixo (case-insensitive - ver normalizeRecordType).
+const RECORD_TYPES = [
+	"A",
+	"AAAA",
+	"CNAME",
+	"MX",
+	"TXT",
+	"NS",
+	"SRV",
+	"CAA",
+] as const;
+type RecordType = (typeof RECORD_TYPES)[number];
+
+function normalizeRecordType(value: string): RecordType | null {
+	const upper = value.toUpperCase();
+	return (RECORD_TYPES as readonly string[]).includes(upper)
+		? (upper as RecordType)
+		: null;
+}
 
 /** Se o último token for só dígitos, é o ttl; senão usa DEFAULT_TTL e o token volta pro conteúdo. */
 function splitContentAndTtl(tokens: string[]): {
@@ -127,7 +151,7 @@ export default defineCommand({
 		.addSubcommandGroup((g) =>
 			g
 				.setName("dns")
-				.setDescription("Gerência de registros DNS.")
+				.setDescription("Gerência simples de registros DNS (sempre tipo A).")
 				.addSubcommand((s) =>
 					s
 						.setName("list")
@@ -135,97 +159,9 @@ export default defineCommand({
 						.addStringOption((o) =>
 							o
 								.setName("dominio")
-								.setDescription("Ex: falevox.com")
-								.setRequired(true),
-						),
-				)
-				.addSubcommand((s) =>
-					s
-						.setName("add")
-						.setDescription("Cria ou atualiza um registro DNS.")
-						.addStringOption((o) =>
-							o
-								.setName("dominio")
-								.setDescription("Ex: falevox.com")
-								.setRequired(true),
-						)
-						.addStringOption((o) =>
-							o
-								.setName("nome")
-								.setDescription("Ex: www, @, _dmarc")
-								.setRequired(true),
-						)
-						.addStringOption((o) =>
-							o
-								.setName("tipo")
-								.setDescription("Ex: A, CNAME, TXT, MX")
-								.setRequired(true),
-						)
-						.addStringOption((o) =>
-							o
-								.setName("conteudo")
-								.setDescription("Valor do registro")
-								.setRequired(true),
-						)
-						.addIntegerOption((o) =>
-							o.setName("ttl").setDescription(`Padrão: ${DEFAULT_TTL}`),
-						),
-				)
-				.addSubcommand((s) =>
-					s
-						.setName("edit")
-						.setDescription(
-							"Alias de `add` - a Hostinger já faz upsert por nome+tipo.",
-						)
-						.addStringOption((o) =>
-							o
-								.setName("dominio")
-								.setDescription("Ex: falevox.com")
-								.setRequired(true),
-						)
-						.addStringOption((o) =>
-							o
-								.setName("nome")
-								.setDescription("Ex: www, @, _dmarc")
-								.setRequired(true),
-						)
-						.addStringOption((o) =>
-							o
-								.setName("tipo")
-								.setDescription("Ex: A, CNAME, TXT, MX")
-								.setRequired(true),
-						)
-						.addStringOption((o) =>
-							o
-								.setName("conteudo")
-								.setDescription("Valor do registro")
-								.setRequired(true),
-						)
-						.addIntegerOption((o) =>
-							o.setName("ttl").setDescription(`Padrão: ${DEFAULT_TTL}`),
-						),
-				)
-				.addSubcommand((s) =>
-					s
-						.setName("remove")
-						.setDescription("Remove um registro DNS.")
-						.addStringOption((o) =>
-							o
-								.setName("dominio")
-								.setDescription("Ex: falevox.com")
-								.setRequired(true),
-						)
-						.addStringOption((o) =>
-							o
-								.setName("nome")
-								.setDescription("Ex: www, @, _dmarc")
-								.setRequired(true),
-						)
-						.addStringOption((o) =>
-							o
-								.setName("tipo")
-								.setDescription("Ex: A, CNAME, TXT, MX")
-								.setRequired(true),
+								.setDescription("Domínio da conta")
+								.setRequired(true)
+								.setAutocomplete(true),
 						),
 				)
 				.addSubcommand((s) =>
@@ -245,6 +181,110 @@ export default defineCommand({
 								.setName("termo")
 								.setDescription("Trecho do nome ou do conteúdo (ex: um IP)")
 								.setRequired(true),
+						),
+				)
+				.addSubcommand((s) =>
+					s
+						.setName("set")
+						.setDescription(
+							"Cria ou atualiza um registro A - domínio completo, com ou sem subdomínio.",
+						)
+						.addStringOption((o) =>
+							o
+								.setName("dominio")
+								.setDescription(
+									"Domínio completo - ex: voip.sofon.cloud, *.batata.falevox.com.br",
+								)
+								.setRequired(true),
+						)
+						.addStringOption((o) =>
+							o
+								.setName("ip")
+								.setDescription("Endereço IP do registro A")
+								.setRequired(true),
+						),
+				)
+				.addSubcommand((s) =>
+					s
+						.setName("remove")
+						.setDescription("Remove o registro A de um domínio completo.")
+						.addStringOption((o) =>
+							o
+								.setName("dominio")
+								.setDescription("Domínio completo - ex: voip.sofon.cloud")
+								.setRequired(true),
+						),
+				),
+		)
+		.addSubcommandGroup((g) =>
+			g
+				.setName("advanceddns")
+				.setDescription(
+					"Gerência de DNS com controle total - qualquer tipo de registro.",
+				)
+				.addSubcommand((s) =>
+					s
+						.setName("add")
+						.setDescription(
+							"Cria ou atualiza um registro DNS de qualquer tipo.",
+						)
+						.addStringOption((o) =>
+							o
+								.setName("tipo")
+								.setDescription("Tipo do registro")
+								.setRequired(true)
+								.addChoices(
+									...RECORD_TYPES.map((t) => ({ name: t, value: t })),
+								),
+						)
+						.addStringOption((o) =>
+							o
+								.setName("subdominio")
+								.setDescription("Ex: www, @, _dmarc, *.api")
+								.setRequired(true),
+						)
+						.addStringOption((o) =>
+							o
+								.setName("dominio")
+								.setDescription("Domínio da conta")
+								.setRequired(true)
+								.setAutocomplete(true),
+						)
+						.addStringOption((o) =>
+							o
+								.setName("conteudo")
+								.setDescription("Valor do registro")
+								.setRequired(true),
+						)
+						.addIntegerOption((o) =>
+							o.setName("ttl").setDescription(`Padrão: ${DEFAULT_TTL}`),
+						),
+				)
+				.addSubcommand((s) =>
+					s
+						.setName("remove")
+						.setDescription("Remove um registro DNS de qualquer tipo.")
+						.addStringOption((o) =>
+							o
+								.setName("subdominio")
+								.setDescription("Ex: www, @, _dmarc, *.api")
+								.setRequired(true),
+						)
+						.addStringOption((o) =>
+							o
+								.setName("dominio")
+								.setDescription("Domínio da conta")
+								.setRequired(true)
+								.setAutocomplete(true),
+						)
+						.addStringOption((o) =>
+							o
+								.setName("tipo")
+								.setDescription("Tipo do registro")
+								.setRequired(true)
+								.addChoices(
+									...RECORD_TYPES.map((t) => ({ name: t, value: t })),
+								),
 						),
 				),
 		)
@@ -287,6 +327,30 @@ export default defineCommand({
 				),
 		),
 
+	// ── Autocomplete ──────────────────────────────────────────────────────────
+	async executeAutocomplete(interaction) {
+		const group = interaction.options.getSubcommandGroup(false);
+		const sub = interaction.options.getSubcommand(false);
+		const isDomainAutocomplete =
+			group === "advanceddns" || (group === "dns" && sub === "list");
+		if (
+			!isDomainAutocomplete ||
+			!(await hasScope(interaction.user.id, "dns"))
+		) {
+			await interaction.respond([]);
+			return;
+		}
+
+		const focused = interaction.options.getFocused().toLowerCase();
+		const domains = await listDomains().catch(() => []);
+		const choices = domains
+			.map((d) => d.domain)
+			.filter((d) => d.toLowerCase().includes(focused))
+			.slice(0, 25);
+		await interaction.respond(choices.map((d) => ({ name: d, value: d })));
+	},
+
+	// ── Slash ─────────────────────────────────────────────────────────────────
 	async executeAsSlash(interaction) {
 		const group = interaction.options.getSubcommandGroup(false);
 		const sub = interaction.options.getSubcommand(true);
@@ -317,7 +381,7 @@ export default defineCommand({
 			return;
 		}
 
-		if (group !== "dns") return;
+		if (group !== "dns" && group !== "advanceddns") return;
 
 		if (!(await hasScope(interaction.user.id, "dns"))) {
 			await interaction.reply({
@@ -327,53 +391,109 @@ export default defineCommand({
 			return;
 		}
 
-		const dominio = interaction.options.getString("dominio", true);
+		if (group === "dns") {
+			const dominio = interaction.options.getString("dominio", true);
 
-		if (sub === "list") {
-			await interaction.deferReply({ ephemeral: true });
-			const rows = await runList(dominio);
-			await presentRecordsPage(
-				rows,
-				`Nenhum registro DNS em ${dominio}.`,
-				interaction.user.id,
-				(payload) => interaction.editReply(payload),
-			);
+			if (sub === "list") {
+				await interaction.deferReply({ ephemeral: true });
+				const rows = await runList(dominio);
+				await presentRecordsPage(
+					rows,
+					`Nenhum registro DNS em ${dominio}.`,
+					interaction.user.id,
+					(payload) => interaction.editReply(payload),
+				);
+				return;
+			}
+
+			if (sub === "search") {
+				const termo = interaction.options.getString("termo", true);
+				await interaction.deferReply({ ephemeral: true });
+				const rows = await runSearch(dominio, termo);
+				await presentRecordsPage(
+					rows,
+					`Nada em ${dominio} bate com "${termo}".`,
+					interaction.user.id,
+					(payload) => interaction.editReply(payload),
+				);
+				return;
+			}
+
+			if (sub === "set") {
+				const ip = interaction.options.getString("ip", true);
+				await interaction.deferReply({ ephemeral: true });
+				const resolved = await resolveDomain(dominio);
+				if (!resolved) {
+					await interaction.editReply(domainNotFound(dominio));
+					return;
+				}
+				await confirmAction({
+					invokerId: interaction.user.id,
+					title: "Criar/atualizar esse registro?",
+					fields: recordFields("A", resolved.subdomain, resolved.domain, ip),
+					send: (payload) => interaction.editReply(payload),
+					onConfirm: () =>
+						runUpsert(
+							resolved.domain,
+							resolved.subdomain,
+							"A",
+							ip,
+							DEFAULT_TTL,
+						),
+				});
+				return;
+			}
+
+			if (sub === "remove") {
+				await interaction.deferReply({ ephemeral: true });
+				const resolved = await resolveDomain(dominio);
+				if (!resolved) {
+					await interaction.editReply(domainNotFound(dominio));
+					return;
+				}
+				await confirmAction({
+					invokerId: interaction.user.id,
+					title: "Remover esse registro?",
+					fields: recordFields("A", resolved.subdomain, resolved.domain),
+					send: (payload) => interaction.editReply(payload),
+					onConfirm: () => runRemove(resolved.domain, resolved.subdomain, "A"),
+				});
+			}
 			return;
 		}
 
-		if (sub === "add" || sub === "edit") {
-			const nome = interaction.options.getString("nome", true);
-			const tipo = interaction.options.getString("tipo", true);
+		// group === "advanceddns"
+		const dominio = interaction.options.getString("dominio", true);
+		const nome = interaction.options.getString("subdominio", true);
+		const tipo = interaction.options.getString("tipo", true);
+
+		if (sub === "add") {
 			const conteudo = interaction.options.getString("conteudo", true);
 			const ttl = interaction.options.getInteger("ttl") ?? DEFAULT_TTL;
 			await interaction.deferReply({ ephemeral: true });
-			await interaction.editReply(
-				await runUpsert(dominio, nome, tipo, conteudo, ttl),
-			);
+			await confirmAction({
+				invokerId: interaction.user.id,
+				title: "Criar/atualizar esse registro?",
+				fields: recordFields(tipo, nome, dominio, conteudo),
+				send: (payload) => interaction.editReply(payload),
+				onConfirm: () => runUpsert(dominio, nome, tipo, conteudo, ttl),
+			});
 			return;
 		}
 
 		if (sub === "remove") {
-			const nome = interaction.options.getString("nome", true);
-			const tipo = interaction.options.getString("tipo", true);
 			await interaction.deferReply({ ephemeral: true });
-			await interaction.editReply(await runRemove(dominio, nome, tipo));
-			return;
-		}
-
-		if (sub === "search") {
-			const termo = interaction.options.getString("termo", true);
-			await interaction.deferReply({ ephemeral: true });
-			const rows = await runSearch(dominio, termo);
-			await presentRecordsPage(
-				rows,
-				`Nada em ${dominio} bate com "${termo}".`,
-				interaction.user.id,
-				(payload) => interaction.editReply(payload),
-			);
+			await confirmAction({
+				invokerId: interaction.user.id,
+				title: "Remover esse registro?",
+				fields: recordFields(tipo, nome, dominio),
+				send: (payload) => interaction.editReply(payload),
+				onConfirm: () => runRemove(dominio, nome, tipo),
+			});
 		}
 	},
 
+	// ── Prefix ────────────────────────────────────────────────────────────────
 	async executeAsPrefix(message, args) {
 		const group = args.getSubcommandGroup();
 		const sub = args.getSubcommand();
@@ -403,10 +523,10 @@ export default defineCommand({
 			return;
 		}
 
-		if (group !== "dns") {
+		if (group !== "dns" && group !== "advanceddns") {
 			await message.reply(
 				EmbedFormatter.warn(
-					"Uso: `!hostinger dns <list|add|edit|remove|search> ...` ou `!hostinger <add-perm|remove-perm> ...`.",
+					"Uso: `!hostinger dns <list|search|set|remove> ...`, `!hostinger advanceddns <add|remove> ...` ou `!hostinger <add-perm|remove-perm> ...`.",
 				),
 			);
 			return;
@@ -418,71 +538,151 @@ export default defineCommand({
 		}
 
 		const tokens = args.getRawArgs();
-		const dominio = tokens[0];
-		if (!dominio) {
-			await message.reply(
-				EmbedFormatter.warn(`Uso: \`!hostinger dns ${sub} <dominio> ...\`.`),
-			);
+
+		if (group === "dns") {
+			const dominio = tokens[0];
+			if (!dominio) {
+				await message.reply(
+					EmbedFormatter.warn(`Uso: \`!hostinger dns ${sub} <dominio> ...\`.`),
+				);
+				return;
+			}
+
+			if (sub === "list") {
+				const rows = await runList(dominio);
+				await presentRecordsPage(
+					rows,
+					`Nenhum registro DNS em ${dominio}.`,
+					message.author.id,
+					(payload) => message.reply(payload),
+				);
+				return;
+			}
+
+			if (sub === "search") {
+				const termo = tokens.slice(1).join(" ");
+				if (!termo) {
+					await message.reply(
+						EmbedFormatter.warn(
+							"Uso: `!hostinger dns search <dominio> <termo>`.",
+						),
+					);
+					return;
+				}
+				const rows = await runSearch(dominio, termo);
+				await presentRecordsPage(
+					rows,
+					`Nada em ${dominio} bate com "${termo}".`,
+					message.author.id,
+					(payload) => message.reply(payload),
+				);
+				return;
+			}
+
+			if (sub === "set") {
+				const ip = tokens[1];
+				if (!ip) {
+					await message.reply(
+						EmbedFormatter.warn("Uso: `!hostinger dns set <dominio> <ip>`."),
+					);
+					return;
+				}
+				const resolved = await resolveDomain(dominio);
+				if (!resolved) {
+					await message.reply(domainNotFound(dominio));
+					return;
+				}
+				await confirmAction({
+					invokerId: message.author.id,
+					title: "Criar/atualizar esse registro?",
+					fields: recordFields("A", resolved.subdomain, resolved.domain, ip),
+					send: (payload) => message.reply(payload),
+					onConfirm: () =>
+						runUpsert(
+							resolved.domain,
+							resolved.subdomain,
+							"A",
+							ip,
+							DEFAULT_TTL,
+						),
+				});
+				return;
+			}
+
+			if (sub === "remove") {
+				const resolved = await resolveDomain(dominio);
+				if (!resolved) {
+					await message.reply(domainNotFound(dominio));
+					return;
+				}
+				await confirmAction({
+					invokerId: message.author.id,
+					title: "Remover esse registro?",
+					fields: recordFields("A", resolved.subdomain, resolved.domain),
+					send: (payload) => message.reply(payload),
+					onConfirm: () => runRemove(resolved.domain, resolved.subdomain, "A"),
+				});
+			}
 			return;
 		}
 
-		if (sub === "list") {
-			const rows = await runList(dominio);
-			await presentRecordsPage(
-				rows,
-				`Nenhum registro DNS em ${dominio}.`,
-				message.author.id,
-				(payload) => message.reply(payload),
-			);
-			return;
-		}
-
-		if (sub === "add" || sub === "edit") {
-			const [nome, tipo, ...resto] = tokens.slice(1);
-			if (!nome || !tipo || resto.length === 0) {
+		// group === "advanceddns"
+		if (sub === "add") {
+			const [tipo, nome, dominio, ...resto] = tokens;
+			if (!tipo || !nome || !dominio || resto.length === 0) {
 				await message.reply(
 					EmbedFormatter.warn(
-						`Uso: \`!hostinger dns ${sub} <dominio> <nome> <tipo> <conteudo> [ttl]\`.`,
+						`Uso: \`!hostinger advanceddns add <${RECORD_TYPES.join("|")}> <subdominio> <dominio> <conteudo> [ttl]\`.`,
+					),
+				);
+				return;
+			}
+			const recordType = normalizeRecordType(tipo);
+			if (!recordType) {
+				await message.reply(
+					EmbedFormatter.warn(
+						`Tipo inválido - use um de: ${RECORD_TYPES.join(", ")}.`,
 					),
 				);
 				return;
 			}
 			const { content, ttl } = splitContentAndTtl(resto);
-			await message.reply(await runUpsert(dominio, nome, tipo, content, ttl));
+			await confirmAction({
+				invokerId: message.author.id,
+				title: "Criar/atualizar esse registro?",
+				fields: recordFields(recordType, nome, dominio, content),
+				send: (payload) => message.reply(payload),
+				onConfirm: () => runUpsert(dominio, nome, recordType, content, ttl),
+			});
 			return;
 		}
 
 		if (sub === "remove") {
-			const [nome, tipo] = tokens.slice(1);
-			if (!nome || !tipo) {
+			const [nome, dominio, tipo] = tokens;
+			if (!nome || !dominio || !tipo) {
 				await message.reply(
 					EmbedFormatter.warn(
-						"Uso: `!hostinger dns remove <dominio> <nome> <tipo>`.",
+						"Uso: `!hostinger advanceddns remove <subdominio> <dominio> <tipo>`.",
 					),
 				);
 				return;
 			}
-			await message.reply(await runRemove(dominio, nome, tipo));
-			return;
-		}
-
-		if (sub === "search") {
-			const termo = tokens.slice(1).join(" ");
-			if (!termo) {
+			const recordType = normalizeRecordType(tipo);
+			if (!recordType) {
 				await message.reply(
 					EmbedFormatter.warn(
-						"Uso: `!hostinger dns search <dominio> <termo>`.",
+						`Tipo inválido - use um de: ${RECORD_TYPES.join(", ")}.`,
 					),
 				);
 				return;
 			}
-			const rows = await runSearch(dominio, termo);
-			await presentRecordsPage(
-				rows,
-				`Nada em ${dominio} bate com "${termo}".`,
-				message.author.id,
-				(payload) => message.reply(payload),
-			);
+			await confirmAction({
+				invokerId: message.author.id,
+				title: "Remover esse registro?",
+				fields: recordFields(recordType, nome, dominio),
+				send: (payload) => message.reply(payload),
+				onConfirm: () => runRemove(dominio, nome, recordType),
+			});
 		}
 	},
 });
@@ -533,6 +733,29 @@ async function runRemove(dominio: string, nome: string, tipo: string) {
 	return EmbedFormatter.success(
 		`Registro \`${tipo.toUpperCase()}\` **${nome}** de ${dominio} removido.`,
 	);
+}
+
+function domainNotFound(fullDomain: string) {
+	return EmbedFormatter.error(
+		`"${fullDomain}" não bate com nenhum domínio da conta Hostinger.`,
+	);
+}
+
+/** Resumo pro diálogo de confirmação (`confirmAction`) - `destino` de fora só faz sentido pra
+ * criar/atualizar (`dns set`, `advanceddns add`); remover não tem o que mostrar aí. */
+function recordFields(
+	tipo: string,
+	subdominio: string,
+	dominio: string,
+	destino?: string,
+): ConfirmField[] {
+	const fields: ConfirmField[] = [
+		{ label: "Tipo", value: tipo.toUpperCase() },
+		{ label: "Subdomínio", value: subdominio },
+		{ label: "Domínio", value: dominio },
+	];
+	if (destino !== undefined) fields.push({ label: "Destino", value: destino });
+	return fields;
 }
 
 async function runSearch(dominio: string, termo: string): Promise<RecordRow[]> {

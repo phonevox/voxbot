@@ -1,4 +1,5 @@
 import type {
+	AutocompleteInteraction,
 	ChatInputCommandInteraction,
 	ClientEvents,
 	Message,
@@ -77,6 +78,16 @@ export interface CommandDefinition {
 	 */
 	execute?: (
 		interaction: ChatInputCommandInteraction,
+		client: BotClient,
+	) => Promise<void>;
+
+	/**
+	 * Handler de autocomplete - chamado enquanto o usuário digita numa option com
+	 * `.setAutocomplete(true)` (ex: opção cujas escolhas vêm de uma API externa, não dá pra fixar
+	 * em `.addChoices()` no registro do comando). Sem handler, essa option nunca sugere nada.
+	 */
+	executeAutocomplete?: (
+		interaction: AutocompleteInteraction,
 		client: BotClient,
 	) => Promise<void>;
 }

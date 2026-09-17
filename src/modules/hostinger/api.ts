@@ -97,3 +97,90 @@ export async function deleteZoneRecord(
 		},
 	);
 }
+
+export interface HostingerDomain {
+	domain: string;
+	status: string;
+}
+
+// Domínio da conta muda raríssimo (comprar/transferir), mas o autocomplete bate aqui a cada tecla
+// digitada - sem cache isso vira uma chamada à API da Hostinger por tecla. 10min é bem folgado
+// pro caso de uso (ninguém precisa ver um domínio novo aparecer no autocomplete em tempo real).
+const DOMAINS_CACHE_TTL_MS = 10 * 60_000;
+let domainsCache: { data: HostingerDomain[]; expiresAt: number } | null = null;
+
+/** Todos os domínios da conta - usado pro autocomplete de `dominio` em !hostinger advanceddns/dns
+ * list e pra `resolveDomain` descobrir onde termina o domínio e começa o subdomínio.
+ * Confirmado ao vivo: a Hostinger devolve `domain: null` pra alguns itens do portfolio (ex: em
+ * transferência) - filtra esses fora aqui, na origem, em vez de cada consumidor ter que se
+ * proteger contra isso na mão. */
+export async function listDomains(): Promise<HostingerDomain[]> {
+	if (domainsCache && domainsCache.expiresAt > Date.now()) {
+		return domainsCache.data;
+	}
+
+	const domains = await hostingerRequest<HostingerDomain[]>(
+		"GET",
+		"/api/domains/v1/portfolio",
+	);
+	const valid = domains.filter(
+		(d): d is HostingerDomain =>
+			typeof d.domain === "string" && d.domain !== "",
+	);
+	if (valid.length !== domains.length) {
+		logger.debug(
+			`listDomains: ${domains.length - valid.length} item(ns) do portfolio sem "domain" válido, ignorado(s) - cru: ${JSON.stringify(domains.filter((d) => !valid.includes(d)))}`,
+		);
+	}
+
+	// Confirmado ao vivo: o portfolio da Hostinger repete o mesmo domínio mais de uma vez (ex: mais
+	// de um recurso/assinatura apontando pro mesmo nome) - sem isso o autocomplete mostrava
+	// "falevox.cloud" duas vezes. Mantém só a primeira ocorrência de cada nome (case-insensitive).
+	const seen = new Set<string>();
+	const unique = valid.filter((d) => {
+		const key = d.domain.toLowerCase();
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+	if (unique.length !== valid.length) {
+		logger.debug(
+			`listDomains: ${valid.length - unique.length} domínio(s) duplicado(s) no portfolio, ignorado(s) - cru: ${JSON.stringify(valid)}`,
+		);
+	}
+
+	domainsCache = { data: unique, expiresAt: Date.now() + DOMAINS_CACHE_TTL_MS };
+	return unique;
+}
+
+export interface ResolvedDomain {
+	domain: string;
+	subdomain: string;
+}
+
+/**
+ * Acha, entre os domínios da conta, o que é sufixo de `fullDomain` (o mais específico, se mais de
+ * um bater) e devolve o subdomínio resultante (`"@"` se `fullDomain` for o próprio domínio raiz).
+ * `null` se nenhum domínio da conta bater. Usado por `!hostinger dns set/remove`, que só recebem
+ * o domínio completo (ex: "voip.sofon.cloud") e precisam descobrir onde a Hostinger corta
+ * domínio de subdomínio.
+ */
+export async function resolveDomain(
+	fullDomain: string,
+): Promise<ResolvedDomain | null> {
+	const normalized = fullDomain.trim().toLowerCase();
+	const domains = await listDomains();
+
+	let best: string | null = null;
+	for (const { domain } of domains) {
+		const d = domain.toLowerCase();
+		if (normalized === d || normalized.endsWith(`.${d}`)) {
+			if (!best || d.length > best.length) best = d;
+		}
+	}
+	if (!best) return null;
+
+	const subdomain =
+		normalized === best ? "@" : normalized.slice(0, -(best.length + 1));
+	return { domain: best, subdomain };
+}
