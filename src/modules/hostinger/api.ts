@@ -66,19 +66,21 @@ export async function getZoneRecords(
 }
 
 /**
- * Upsert de um registro (overwrite: false) - a própria API já resolve create vs update: se já
- * existe um registro com esse name+type ela atualiza, senão cria. Não precisa (nem dá, sem uma
- * GET antes) distinguir "add" de "edit" no nosso lado.
+ * Cria um registro (`overwrite: false`) ou sobrescreve um já existente com esse name+type
+ * (`overwrite: true`). Confirmado ao vivo: `overwrite: false` NÃO faz upsert sozinho - se já
+ * existir um registro conflitante, a Hostinger rejeita com 422 (`DNS:4008`) em vez de atualizar.
+ * O chamador precisa checar antes (`getZoneRecords`) se o registro já existe pra saber qual usar.
  */
 export async function upsertZoneRecord(
 	domain: string,
 	entry: HostingerZoneEntry,
+	overwrite = false,
 ): Promise<void> {
 	await hostingerRequest(
 		"PUT",
 		`/api/dns/v1/zones/${encodeURIComponent(domain)}`,
 		{
-			overwrite: false,
+			overwrite,
 			zone: [entry],
 		},
 	);

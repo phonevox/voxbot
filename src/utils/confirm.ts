@@ -14,6 +14,7 @@ const logger = new Logger("utils.confirm");
 
 const CONFIRM_ID = "confirm-yes";
 const CANCEL_ID = "confirm-no";
+const DEFAULT_COLOR = 0x5865f2;
 
 export interface ConfirmField {
 	label: string;
@@ -41,12 +42,14 @@ export function buildConfirmRow(): ActionRowBuilder<ButtonBuilder> {
 }
 
 /** Container ComponentsV2 com o resumo da ação, um campo por linha - pronto pra ir junto de
- * `buildConfirmRow()` num mesmo `components: [...]`. */
+ * `buildConfirmRow()` num mesmo `components: [...]`. `color` padrão é o blurple do bot; passe um
+ * diferente pra destacar a severidade (ex: laranja pra sobrescrita, vermelho pra remoção). */
 export function buildConfirmContainer(
 	title: string,
 	fields: ConfirmField[],
+	color: number = DEFAULT_COLOR,
 ): ContainerBuilder {
-	const container = new ContainerBuilder().setAccentColor(0x5865f2);
+	const container = new ContainerBuilder().setAccentColor(color);
 	const lines = fields.map((f) => `- ${f.label}: \`${f.value}\``).join("\n");
 	container.addTextDisplayComponents((td) =>
 		td.setContent(`**${title}**\n${lines}`),
@@ -62,6 +65,8 @@ export interface ConfirmActionOptions {
 	title: string;
 	/** Resumo da ação, um campo por linha (ex: tipo/subdomínio/domínio/destino). */
 	fields: ConfirmField[];
+	/** Accent do container - padrão blurple. Use pra sinalizar severidade (laranja/vermelho). */
+	color?: number;
 	/**
 	 * Manda o payload inicial (resumo + botões) e devolve a `Message` - `(p) => interaction.editReply(p)`
 	 * numa interaction já deferida, ou `(p) => message.reply(p)` num comando de prefixo. Mesma
@@ -85,6 +90,7 @@ export async function confirmAction(opts: ConfirmActionOptions): Promise<void> {
 		invokerId,
 		title,
 		fields,
+		color,
 		send,
 		onConfirm,
 		timeoutMs = 20_000,
@@ -92,7 +98,10 @@ export async function confirmAction(opts: ConfirmActionOptions): Promise<void> {
 
 	const sent = await send({
 		flags: MessageFlags.IsComponentsV2,
-		components: [buildConfirmContainer(title, fields), buildConfirmRow()],
+		components: [
+			buildConfirmContainer(title, fields, color),
+			buildConfirmRow(),
+		],
 	});
 
 	let handled = false;
