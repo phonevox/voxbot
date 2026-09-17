@@ -592,14 +592,21 @@ interface SearchOutcome {
 
 /** "contrato" tem fluxo próprio (handleContrato/renderContratoPage) - sempre um único registro,
  * paginado por produto em vez de por página de resultados. */
-async function runSearch(sub: string, busca: string): Promise<SearchOutcome> {
+async function runSearch(
+	sub: string,
+	busca: string,
+	verInativos: boolean,
+): Promise<SearchOutcome> {
 	switch (sub) {
 		case "buscar": {
 			const result = await buscarCliente(busca);
+			const registros = verInativos
+				? result.registros
+				: result.registros.filter((r) => !isInativo(r));
 			return {
-				result,
+				result: { ...result, registros },
 				view: CLIENTE_VIEW,
-				extraFor: await contratosPorCliente(result.registros),
+				extraFor: await contratosPorCliente(registros),
 			};
 		}
 		case "buscar-doc": {
@@ -824,7 +831,15 @@ export default defineCommand({
 				.setDescription(
 					"Busca cliente por id ou nome - já mostra os contratos vinculados.",
 				)
-				.addStringOption(buscaOption("id ou nome do cliente (razão social)")),
+				.addStringOption(buscaOption("id ou nome do cliente (razão social)"))
+				.addBooleanOption((o) =>
+					o
+						.setName("verinativos")
+						.setDescription(
+							"Mostra clientes inativos também (padrão: oculta). No prefixo: --verInativos.",
+						)
+						.setRequired(false),
+				),
 		)
 		.addSubcommand((s) =>
 			s
@@ -869,6 +884,7 @@ export default defineCommand({
 
 		const sub = interaction.options.getSubcommand(true);
 		const busca = interaction.options.getString("busca", true);
+		const verInativos = interaction.options.getBoolean("verinativos") ?? false;
 
 		await interaction.deferReply({ ephemeral: true });
 		try {
@@ -896,7 +912,11 @@ export default defineCommand({
 				return;
 			}
 
-			const { result, view, extraFor } = await runSearch(sub, busca);
+			const { result, view, extraFor } = await runSearch(
+				sub,
+				busca,
+				verInativos,
+			);
 			const pages = Math.max(1, Math.ceil(result.registros.length / PER_PAGE));
 			const render = (page: number, interactive: boolean) =>
 				renderPage(result, view, extraFor, page, interactive);
@@ -927,6 +947,7 @@ export default defineCommand({
 
 		const sub = args.getSubcommand();
 		const busca = args.getString("busca");
+		const verInativos = args.getBoolean("verinativos") ?? false;
 		if (!sub || !busca) {
 			await message.reply(
 				EmbedFormatter.warn(
@@ -961,7 +982,11 @@ export default defineCommand({
 				return;
 			}
 
-			const { result, view, extraFor } = await runSearch(sub, busca);
+			const { result, view, extraFor } = await runSearch(
+				sub,
+				busca,
+				verInativos,
+			);
 			const pages = Math.max(1, Math.ceil(result.registros.length / PER_PAGE));
 			const render = (page: number, interactive: boolean) =>
 				renderPage(result, view, extraFor, page, interactive);

@@ -8,6 +8,7 @@ import type {
 	SlashCommandSubcommandsOnlyBuilder,
 	User,
 } from "discord.js";
+import { config } from "@/config";
 import type { BotClient } from "./BotClient";
 
 // ─── Derivação de schema ────────────────────────────────────────────────────────
@@ -121,6 +122,33 @@ function extractId(input: string, pattern: RegExp): string | null {
 	return null;
 }
 
+// ─── Flags estilo CLI (--nome / --nome=valor) ──────────────────────────────────
+
+const FLAG_PATTERN = /^--([A-Za-z][\w-]*)(?:=(.*))?$/;
+
+/**
+ * Atrás de DEV_ALLOW_ARGS_AS_FLAGS (config.bot.allowArgsAsFlags) - com a flag desligada, devolve os
+ * tokens intactos e nenhum comando muda de comportamento. Ligada, separa tokens `--nome`/`--nome=valor`
+ * dos posicionais (em qualquer posição), pra dar pra setar uma opção sem "gastar" a posição do
+ * último argumento guloso (ex: `!ixc buscar Empresa Tal --verInativos` continua com "Empresa Tal"
+ * inteiro como busca).
+ */
+function extractFlags(raw: string[]): {
+	positional: string[];
+	flags: Map<string, string>;
+} {
+	const flags = new Map<string, string>();
+	if (!config.bot.allowArgsAsFlags) return { positional: raw, flags };
+
+	const positional: string[] = [];
+	for (const token of raw) {
+		const m = token.match(FLAG_PATTERN);
+		if (m) flags.set(m[1].toLowerCase(), m[2] ?? "true");
+		else positional.push(token);
+	}
+	return { positional, flags };
+}
+
 // ─── PrefixArgs ───────────────────────────────────────────────────────────────
 
 /**
@@ -142,6 +170,7 @@ function extractId(input: string, pattern: RegExp): string | null {
 export class PrefixArgs {
 	private readonly activeSchema: ArgSchema[];
 	private readonly activeRaw: string[];
+	private readonly flags: Map<string, string>;
 	private readonly _subcommand: string | null;
 	private readonly _subcommandGroup: string | null;
 
@@ -152,11 +181,14 @@ export class PrefixArgs {
 		private readonly client: BotClient,
 		subcommandMap?: Map<string, SubcommandSchema>,
 	) {
+		const { positional, flags } = extractFlags(raw);
+		this.flags = flags;
+
 		if (subcommandMap && subcommandMap.size > 0) {
 			// Modo subcomando. Tenta um match agrupado primeiro (2 tokens: grupo + sub),
 			// depois cai para um match simples (1 token).
-			const first = raw[0]?.toLowerCase() ?? null;
-			const second = raw[1]?.toLowerCase() ?? null;
+			const first = positional[0]?.toLowerCase() ?? null;
+			const second = positional[1]?.toLowerCase() ?? null;
 			const grouped =
 				first && second ? subcommandMap.get(`${first}:${second}`) : undefined;
 
@@ -166,13 +198,13 @@ export class PrefixArgs {
 			this._subcommand = sub?.name ?? null;
 			this._subcommandGroup = sub?.group ?? null;
 			this.activeSchema = sub?.options ?? [];
-			this.activeRaw = sub ? raw.slice(consumed) : raw.slice(1);
+			this.activeRaw = sub ? positional.slice(consumed) : positional.slice(1);
 		} else {
 			// Modo simples
 			this._subcommand = null;
 			this._subcommandGroup = null;
 			this.activeSchema = schema;
-			this.activeRaw = raw;
+			this.activeRaw = positional;
 		}
 	}
 
@@ -193,6 +225,8 @@ export class PrefixArgs {
 	}
 
 	private getRaw(name: string): string | null {
+		const flagValue = this.flags.get(name.toLowerCase());
+		if (flagValue !== undefined) return flagValue;
 		const idx = this.activeSchema.findIndex((a) => a.name === name);
 		if (idx === -1) return null;
 		// O último argumento é guloso - junta todos os tokens restantes
