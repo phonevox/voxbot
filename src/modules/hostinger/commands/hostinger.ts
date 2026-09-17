@@ -6,7 +6,11 @@ import {
 } from "discord.js";
 import { defineCommand } from "@/define";
 import { CommandCategory } from "@/types";
-import { type ConfirmField, confirmAction } from "@/utils/confirm";
+import {
+	type ConfirmField,
+	type ConfirmPayload,
+	confirmAction,
+} from "@/utils/confirm";
 import { EmbedFormatter, formatCodeblock, userMention } from "@/utils/format";
 import { attachPagination, buildPaginationRow } from "@/utils/pagination";
 import {
@@ -29,6 +33,11 @@ import {
 const DEFAULT_TTL = 3600;
 const NO_PERM_MSG =
 	"Você não tem permissão pra mexer no DNS da Hostinger. Peça pra alguém com acesso rodar `!hostinger add-perm`.";
+
+// Cores da confirmação por severidade (ver ConfirmActionOptions.color) - sobrescrita é "atenção",
+// remoção é "perigo", nem toda confirmação é igual.
+const OVERWRITE_COLOR = 0xe67e22;
+const REMOVE_COLOR = 0xed4245;
 
 /*
  * Permissão própria (tabela hostinger_permissions), não guard do framework - isso é acesso a
@@ -427,19 +436,14 @@ export default defineCommand({
 					await interaction.editReply(domainNotFound(dominio));
 					return;
 				}
-				await confirmAction({
+				await upsertWithConfirmIfExists({
 					invokerId: interaction.user.id,
-					title: "Criar/atualizar esse registro?",
-					fields: recordFields("A", resolved.subdomain, resolved.domain, ip),
+					dominio: resolved.domain,
+					nome: resolved.subdomain,
+					tipo: "A",
+					conteudo: ip,
+					ttl: DEFAULT_TTL,
 					send: (payload) => interaction.editReply(payload),
-					onConfirm: () =>
-						runUpsert(
-							resolved.domain,
-							resolved.subdomain,
-							"A",
-							ip,
-							DEFAULT_TTL,
-						),
 				});
 				return;
 			}
@@ -455,6 +459,7 @@ export default defineCommand({
 					invokerId: interaction.user.id,
 					title: "Remover esse registro?",
 					fields: recordFields("A", resolved.subdomain, resolved.domain),
+					color: REMOVE_COLOR,
 					send: (payload) => interaction.editReply(payload),
 					onConfirm: () => runRemove(resolved.domain, resolved.subdomain, "A"),
 				});
@@ -471,12 +476,14 @@ export default defineCommand({
 			const conteudo = interaction.options.getString("conteudo", true);
 			const ttl = interaction.options.getInteger("ttl") ?? DEFAULT_TTL;
 			await interaction.deferReply({ ephemeral: true });
-			await confirmAction({
+			await upsertWithConfirmIfExists({
 				invokerId: interaction.user.id,
-				title: "Criar/atualizar esse registro?",
-				fields: recordFields(tipo, nome, dominio, conteudo),
+				dominio,
+				nome,
+				tipo,
+				conteudo,
+				ttl,
 				send: (payload) => interaction.editReply(payload),
-				onConfirm: () => runUpsert(dominio, nome, tipo, conteudo, ttl),
 			});
 			return;
 		}
@@ -487,6 +494,7 @@ export default defineCommand({
 				invokerId: interaction.user.id,
 				title: "Remover esse registro?",
 				fields: recordFields(tipo, nome, dominio),
+				color: REMOVE_COLOR,
 				send: (payload) => interaction.editReply(payload),
 				onConfirm: () => runRemove(dominio, nome, tipo),
 			});
@@ -592,19 +600,14 @@ export default defineCommand({
 					await message.reply(domainNotFound(dominio));
 					return;
 				}
-				await confirmAction({
+				await upsertWithConfirmIfExists({
 					invokerId: message.author.id,
-					title: "Criar/atualizar esse registro?",
-					fields: recordFields("A", resolved.subdomain, resolved.domain, ip),
+					dominio: resolved.domain,
+					nome: resolved.subdomain,
+					tipo: "A",
+					conteudo: ip,
+					ttl: DEFAULT_TTL,
 					send: (payload) => message.reply(payload),
-					onConfirm: () =>
-						runUpsert(
-							resolved.domain,
-							resolved.subdomain,
-							"A",
-							ip,
-							DEFAULT_TTL,
-						),
 				});
 				return;
 			}
@@ -619,6 +622,7 @@ export default defineCommand({
 					invokerId: message.author.id,
 					title: "Remover esse registro?",
 					fields: recordFields("A", resolved.subdomain, resolved.domain),
+					color: REMOVE_COLOR,
 					send: (payload) => message.reply(payload),
 					onConfirm: () => runRemove(resolved.domain, resolved.subdomain, "A"),
 				});
@@ -647,12 +651,14 @@ export default defineCommand({
 				return;
 			}
 			const { content, ttl } = splitContentAndTtl(resto);
-			await confirmAction({
+			await upsertWithConfirmIfExists({
 				invokerId: message.author.id,
-				title: "Criar/atualizar esse registro?",
-				fields: recordFields(recordType, nome, dominio, content),
+				dominio,
+				nome,
+				tipo: recordType,
+				conteudo: content,
+				ttl,
 				send: (payload) => message.reply(payload),
-				onConfirm: () => runUpsert(dominio, nome, recordType, content, ttl),
 			});
 			return;
 		}
@@ -680,6 +686,7 @@ export default defineCommand({
 				invokerId: message.author.id,
 				title: "Remover esse registro?",
 				fields: recordFields(recordType, nome, dominio),
+				color: REMOVE_COLOR,
 				send: (payload) => message.reply(payload),
 				onConfirm: () => runRemove(dominio, nome, recordType),
 			});
@@ -716,16 +723,90 @@ async function runUpsert(
 	tipo: string,
 	conteudo: string,
 	ttl: number,
+	overwrite: boolean,
 ) {
-	await upsertZoneRecord(dominio, {
-		name: nome,
-		type: tipo.toUpperCase(),
-		ttl,
-		records: [{ content: conteudo }],
-	});
+	await upsertZoneRecord(
+		dominio,
+		{
+			name: nome,
+			type: tipo.toUpperCase(),
+			ttl,
+			records: [{ content: conteudo }],
+		},
+		overwrite,
+	);
 	return EmbedFormatter.success(
 		`Registro \`${tipo.toUpperCase()}\` **${nome}** de ${dominio} → ${conteudo} (ttl ${ttl}).`,
 	);
+}
+
+async function findExistingRecord(
+	dominio: string,
+	nome: string,
+	tipo: string,
+): Promise<HostingerZoneEntry | null> {
+	const upperTipo = tipo.toUpperCase();
+	const entries = await getZoneRecords(dominio);
+	return (
+		entries.find(
+			(e) =>
+				e.name.toLowerCase() === nome.toLowerCase() &&
+				e.type.toUpperCase() === upperTipo,
+		) ?? null
+	);
+}
+
+interface UpsertConfirmOpts {
+	invokerId: string;
+	dominio: string;
+	nome: string;
+	tipo: string;
+	conteudo: string;
+	ttl: number;
+	send: (payload: ConfirmPayload) => Promise<Message>;
+}
+
+/**
+ * `dns set`/`advanceddns add` sempre confirmam antes de gravar - vale a chance de pegar um erro de
+ * digitação (nome/domínio errado) antes de executar. Quando já existe um registro com esse
+ * nome+tipo, o resumo avisa que é sobrescrita de verdade e mostra o valor atual - `overwrite: true`
+ * no upsert só entra depois dessa confirmação (ver comentário em `upsertZoneRecord`).
+ */
+async function upsertWithConfirmIfExists(
+	opts: UpsertConfirmOpts,
+): Promise<void> {
+	const { invokerId, dominio, nome, tipo, conteudo, ttl, send } = opts;
+	const existing = await findExistingRecord(dominio, nome, tipo);
+
+	const baseFields: ConfirmField[] = [
+		{ label: "Tipo", value: tipo.toUpperCase() },
+		{ label: "Subdomínio", value: nome },
+		{ label: "Domínio", value: dominio },
+	];
+
+	if (existing) {
+		await confirmAction({
+			invokerId,
+			title: "Esse registro já existe - sobrescrever?",
+			fields: [
+				...baseFields,
+				{ label: "Valor atual", value: existing.records[0]?.content ?? "?" },
+				{ label: "Novo valor", value: conteudo },
+			],
+			color: OVERWRITE_COLOR,
+			send,
+			onConfirm: () => runUpsert(dominio, nome, tipo, conteudo, ttl, true),
+		});
+		return;
+	}
+
+	await confirmAction({
+		invokerId,
+		title: "Criar esse registro?",
+		fields: [...baseFields, { label: "Destino", value: conteudo }],
+		send,
+		onConfirm: () => runUpsert(dominio, nome, tipo, conteudo, ttl, false),
+	});
 }
 
 async function runRemove(dominio: string, nome: string, tipo: string) {
