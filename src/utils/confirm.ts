@@ -8,6 +8,9 @@ import {
 	MessageFlags,
 } from "discord.js";
 import { EmbedFormatter, type FormattedReply } from "./format";
+import { Logger } from "./logging";
+
+const logger = new Logger("utils.confirm");
 
 const CONFIRM_ID = "confirm-yes";
 const CANCEL_ID = "confirm-no";
@@ -43,12 +46,10 @@ export function buildConfirmContainer(
 	title: string,
 	fields: ConfirmField[],
 ): ContainerBuilder {
-	const container = new ContainerBuilder().setAccentColor(0xffff00);
-	const lines = fields
-		.map((f) => `- **${f.label}:** \`${f.value}\``)
-		.join("\n");
+	const container = new ContainerBuilder().setAccentColor(0x5865f2);
+	const lines = fields.map((f) => `- ${f.label}: \`${f.value}\``).join("\n");
 	container.addTextDisplayComponents((td) =>
-		td.setContent(`-# ⚠️\n**${title}**\n${lines}`),
+		td.setContent(`**${title}**\n${lines}`),
 	);
 	return container;
 }
@@ -116,13 +117,26 @@ export async function confirmAction(opts: ConfirmActionOptions): Promise<void> {
 			return;
 		}
 
-		await i.update(await onConfirm()).catch(() => {});
+		// `onConfirm` costuma bater numa API externa - pode passar dos ~3s que o Discord dá pra
+		// reconhecer o clique, e aí `i.update()` direto falhava com "app não respondeu a tempo" (e
+		// silencioso, porque o catch(() => {}) engolia o erro). `deferUpdate` reconhece na hora,
+		// mantendo a mensagem como está, e libera pra editar com `editReply` só quando `onConfirm`
+		// terminar - sem prazo.
+		await i.deferUpdate().catch(() => {});
+		try {
+			await i.editReply(await onConfirm());
+		} catch (err) {
+			logger.error(err instanceof Error ? err : new Error(String(err)));
+			await i
+				.editReply(EmbedFormatter.error("Erro ao executar a ação!"))
+				.catch(() => {});
+		}
 	});
 
 	collector.on("end", async () => {
 		if (!handled) {
 			await sent
-				.edit(EmbedFormatter.warn("Confirmação expirou - nada foi alterado."))
+				.edit(EmbedFormatter.warn("Confirmação expirou."))
 				.catch(() => {});
 		}
 	});
