@@ -767,10 +767,10 @@ interface UpsertConfirmOpts {
 }
 
 /**
- * `dns set`/`advanceddns add` só pedem confirmação quando já existe um registro com esse
- * nome+tipo - aí é sobrescrita de verdade, vale avisar antes com o valor atual. Sem conflito, cria
- * direto, sem fricção pra quem só tá adicionando algo novo. `overwrite: true` no upsert só entra
- * depois que o usuário confirma (ver comentário em `upsertZoneRecord`).
+ * `dns set`/`advanceddns add` sempre confirmam antes de gravar - vale a chance de pegar um erro de
+ * digitação (nome/domínio errado) antes de executar. Quando já existe um registro com esse
+ * nome+tipo, o resumo avisa que é sobrescrita de verdade e mostra o valor atual - `overwrite: true`
+ * no upsert só entra depois dessa confirmação (ver comentário em `upsertZoneRecord`).
  */
 async function upsertWithConfirmIfExists(
 	opts: UpsertConfirmOpts,
@@ -778,24 +778,34 @@ async function upsertWithConfirmIfExists(
 	const { invokerId, dominio, nome, tipo, conteudo, ttl, send } = opts;
 	const existing = await findExistingRecord(dominio, nome, tipo);
 
-	if (!existing) {
-		await send(await runUpsert(dominio, nome, tipo, conteudo, ttl, false));
+	const baseFields: ConfirmField[] = [
+		{ label: "Tipo", value: tipo.toUpperCase() },
+		{ label: "Subdomínio", value: nome },
+		{ label: "Domínio", value: dominio },
+	];
+
+	if (existing) {
+		await confirmAction({
+			invokerId,
+			title: "Esse registro já existe - sobrescrever?",
+			fields: [
+				...baseFields,
+				{ label: "Valor atual", value: existing.records[0]?.content ?? "?" },
+				{ label: "Novo valor", value: conteudo },
+			],
+			color: OVERWRITE_COLOR,
+			send,
+			onConfirm: () => runUpsert(dominio, nome, tipo, conteudo, ttl, true),
+		});
 		return;
 	}
 
 	await confirmAction({
 		invokerId,
-		title: "Esse registro já existe - sobrescrever?",
-		fields: [
-			{ label: "Tipo", value: tipo.toUpperCase() },
-			{ label: "Subdomínio", value: nome },
-			{ label: "Domínio", value: dominio },
-			{ label: "Valor atual", value: existing.records[0]?.content ?? "?" },
-			{ label: "Novo valor", value: conteudo },
-		],
-		color: OVERWRITE_COLOR,
+		title: "Criar esse registro?",
+		fields: [...baseFields, { label: "Destino", value: conteudo }],
 		send,
-		onConfirm: () => runUpsert(dominio, nome, tipo, conteudo, ttl, true),
+		onConfirm: () => runUpsert(dominio, nome, tipo, conteudo, ttl, false),
 	});
 }
 
