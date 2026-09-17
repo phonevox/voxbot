@@ -1,41 +1,95 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import {
+	ContainerBuilder,
+	MessageFlags,
+	SeparatorSpacingSize,
+	SlashCommandBuilder,
+} from "discord.js";
+import { config } from "@/config";
 import type { BotClient } from "@/core/BotClient";
+import { getGuildPrefix } from "@/database/guildRepository";
 import { defineCommand } from "@/define";
 import { CommandCategory, type CommandDefinition } from "@/types";
+import { EmbedFormatter } from "@/utils/format";
 import { Logger } from "@/utils/logging";
 import { attachPagination, buildPaginationRow } from "@/utils/pagination";
-import { config } from "../../../config";
-import { getGuildPrefix } from "../../../database/guildRepository";
 
 const logger = new Logger("core.commands.help");
 
 const PER_PAGE = 5;
+const ACCENT = 0x5865f2;
 
-// ─── Shared builders ──────────────────────────────────────────────────────────
+const CATEGORY_LABEL: Record<CommandCategory, string> = {
+	[CommandCategory.GENERAL]: "Geral",
+	[CommandCategory.ADMIN]: "Administração",
+	[CommandCategory.MODERATION]: "Moderação",
+	[CommandCategory.FUN]: "Diversão",
+	[CommandCategory.UTILITY]: "Utilidade",
+	[CommandCategory.MUSIC]: "Música",
+	[CommandCategory.ECONOMY]: "Economia",
+};
 
-function buildEmbed(
+function addDivider(container: ContainerBuilder): void {
+	container.addSeparatorComponents((sep) =>
+		sep.setDivider(true).setSpacing(SeparatorSpacingSize.Small),
+	);
+}
+
+/**
+ * `invokeName` é `"/"` (slash) ou o prefixo do servidor (ex: `"!"`) - unifica os dois formatos:
+ * `commandLabel("/", ["ixc", "buscar"])` -> "/ixc buscar", `commandLabel("!", [...])` -> "!ixc buscar".
+ * É o que faz o `!help` de um comando mostrar a sintaxe de PREFIXO de verdade em vez de sempre
+ * mostrar a barra, que era o principal defeito do help antigo.
+ */
+function commandLabel(invokeName: string, parts: string[]): string {
+	return `${invokeName}${parts.join(" ")}`;
+}
+
+// ─── Lista (`/help`, `!help`) ───────────────────────────────────────────────────
+
+function getVisibleCommands(client: BotClient): CommandDefinition[] {
+	return client.commands
+		.getAll()
+		.filter((c) => c.showOnHelp !== false)
+		.sort(
+			(a, b) =>
+				(a.category ?? "").localeCompare(b.category ?? "") ||
+				a.name.localeCompare(b.name),
+		);
+}
+
+function buildListContainer(
 	page: number,
 	all: CommandDefinition[],
 	pages: number,
-	prefix: string,
-): EmbedBuilder {
+	invokeName: string,
+): ContainerBuilder {
 	const slice = all.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
-	return new EmbedBuilder()
-		.setColor(0x5865f2)
-		.setTitle("📋 Comandos")
-		.setDescription(
-			`Use \`/help <comando>\` ou \`${prefix}help <comando>\` para detalhes.\n​`,
-		)
-		.setFooter({
-			text: `Página ${page + 1} de ${pages} · ${all.length} comando(s)`,
-		})
-		.addFields(
-			slice.map((cmd) => ({
-				name: `/${cmd.name}`,
-				value: cmd.description,
-				inline: false,
-			})),
+	const container = new ContainerBuilder().setAccentColor(ACCENT);
+
+	container.addTextDisplayComponents((td) =>
+		td.setContent(
+			`**📋 Comandos**\n-# Use \`${invokeName}help <comando>\` para ver detalhes de um comando.`,
+		),
+	);
+
+	slice.forEach((cmd) => {
+		addDivider(container);
+		const label = CATEGORY_LABEL[cmd.category ?? CommandCategory.GENERAL];
+		container.addTextDisplayComponents((td) =>
+			td.setContent(
+				`-# ${label}\n**${commandLabel(invokeName, [cmd.name])}**\n${cmd.description}`,
+			),
 		);
+	});
+
+	addDivider(container);
+	container.addTextDisplayComponents((td) =>
+		td.setContent(
+			`-# Página ${page + 1} de ${pages} · ${all.length} comando(s)`,
+		),
+	);
+
+	return container;
 }
 
 function renderList(
@@ -43,13 +97,18 @@ function renderList(
 	interactive: boolean,
 	all: CommandDefinition[],
 	pages: number,
-	prefix: string,
+	invokeName: string,
 ) {
 	return {
-		embeds: [buildEmbed(page, all, pages, prefix)],
-		components: interactive ? [buildPaginationRow(page, pages)] : [],
+		flags: MessageFlags.IsComponentsV2 as const,
+		components: [
+			buildListContainer(page, all, pages, invokeName),
+			...(interactive ? [buildPaginationRow(page, pages)] : []),
+		],
 	};
 }
+
+// ─── Detalhe (`/help <comando> [...path]`) ──────────────────────────────────────
 
 const ARG_TYPES = [3, 4, 5, 6, 7, 8, 10];
 const SUB_COMMAND = 1;
@@ -63,59 +122,47 @@ interface RawOption {
 	options?: RawOption[];
 }
 
-function formatArgList(options: RawOption[] | undefined): string {
+/** Opcional em modo prefixo com flags ligado vira `--nome` (a única forma que funciona sem
+ * atropelar o argumento posicional guloso - ver DEV_ALLOW_ARGS_AS_FLAGS/PrefixArgs); senão cai
+ * pro `[nome]` de sempre (posicional, na ordem). */
+function formatArgToken(a: RawOption, useFlagHint: boolean): string {
+	if (a.required) return `<${a.name}>`;
+	return useFlagHint ? `[--${a.name}]` : `[${a.name}]`;
+}
+
+function formatArgList(
+	options: RawOption[] | undefined,
+	useFlagHint: boolean,
+): string {
 	const args = (options ?? []).filter((o) => ARG_TYPES.includes(o.type));
 	if (!args.length) return "";
-	return (
-		" " +
-		args.map((a) => (a.required ? `<${a.name}>` : `[${a.name}]`)).join(" ")
-	);
+	return ` ${args.map((a) => formatArgToken(a, useFlagHint)).join(" ")}`;
 }
 
 function formatSubcommandLine(
+	invokeName: string,
 	cmdName: string,
 	path: string[],
 	sub: RawOption,
+	useFlagHint: boolean,
 ): string {
-	return `\`/${cmdName} ${[...path, sub.name].join(" ")}${formatArgList(sub.options)}\` - ${sub.description}`;
+	const label = commandLabel(invokeName, [cmdName, ...path, sub.name]);
+	return `\`${label}${formatArgList(sub.options, useFlagHint)}\` - ${sub.description}`;
 }
 
-/** Divide uma lista de linhas já unidas por newline em pedaços de campo de embed com até 1024 caracteres. */
-function chunkLines(lines: string[], limit = 1024): string[] {
-	const chunks: string[] = [];
-	let current: string[] = [];
-	let length = 0;
-
-	for (const line of lines) {
-		if (current.length && length + 1 + line.length > limit) {
-			chunks.push(current.join("\n"));
-			current = [];
-			length = 0;
-		}
-		current.push(line);
-		length += (current.length > 1 ? 1 : 0) + line.length;
-	}
-	if (current.length) chunks.push(current.join("\n"));
-	return chunks;
-}
-
-function addFieldChunks(
-	embed: EmbedBuilder,
-	name: string,
-	lines: string[],
+function addRestrictions(
+	container: ContainerBuilder,
+	cmd: CommandDefinition,
 ): void {
-	chunkLines(lines).forEach((value, i) => {
-		embed.addFields({ name: i === 0 ? name : "​", value });
-	});
-}
-
-function addRestrictions(embed: EmbedBuilder, cmd: CommandDefinition): void {
 	const flags: string[] = [];
 	if (cmd.botOwnerOnly) flags.push("Somente desenvolvedores");
 	if (cmd.adminOnly) flags.push("Somente administradores");
 	if (cmd.allowedUsers?.length) flags.push("Usuários específicos");
-	if (flags.length)
-		embed.addFields({ name: "Restrições", value: flags.join(" · ") });
+	if (!flags.length) return;
+	addDivider(container);
+	container.addTextDisplayComponents((td) =>
+		td.setContent(`-# 🔒 Restrições: ${flags.join(" · ")}`),
+	);
 }
 
 /**
@@ -124,132 +171,158 @@ function addRestrictions(embed: EmbedBuilder, cmd: CommandDefinition): void {
  * são listados só pelo nome (aprofunde com `/help <command> <group>`), subcomandos
  * soltos são listados por completo já que não tem mais nada pra aprofundar.
  */
-function buildSummaryEmbed(
+function buildSummaryContainer(
 	cmd: CommandDefinition,
 	topLevel: RawOption[],
-): EmbedBuilder {
+	invokeName: string,
+): ContainerBuilder {
 	const groups = topLevel.filter((o) => o.type === SUB_COMMAND_GROUP);
 	const subcommands = topLevel.filter((o) => o.type === SUB_COMMAND);
 	const plainArgs = topLevel.filter((o) => ARG_TYPES.includes(o.type));
+	const useFlagHint = invokeName !== "/" && config.bot.allowArgsAsFlags;
 
+	const container = new ContainerBuilder().setAccentColor(ACCENT);
+	const label = commandLabel(invokeName, [cmd.name]);
 	const description = groups.length
-		? `${cmd.description}\n\nUse \`/help ${cmd.name} <grupo>\` para ver os subcomandos de um grupo.`
+		? `${cmd.description}\n-# Use \`${invokeName}help ${cmd.name} <grupo>\` para ver os subcomandos de um grupo.`
 		: cmd.description;
-
-	const embed = new EmbedBuilder()
-		.setColor(0x5865f2)
-		.setTitle(`/${cmd.name}`)
-		.setDescription(description);
+	container.addTextDisplayComponents((td) =>
+		td.setContent(`**${label}**\n${description}`),
+	);
 
 	if (groups.length || subcommands.length) {
+		addDivider(container);
 		const lines = [
 			...groups.map(
-				(g) => `\`/${cmd.name} ${g.name}\` (grupo) - ${g.description}`,
+				(g) =>
+					`\`${commandLabel(invokeName, [cmd.name, g.name])}\` (grupo) - ${g.description}`,
 			),
-			...subcommands.map((s) => formatSubcommandLine(cmd.name, [], s)),
+			...subcommands.map((s) =>
+				formatSubcommandLine(invokeName, cmd.name, [], s, useFlagHint),
+			),
 		];
-		addFieldChunks(embed, "Subcomandos", lines);
+		container.addTextDisplayComponents((td) =>
+			td.setContent(["**Subcomandos**", ...lines].join("\n")),
+		);
 	} else if (plainArgs.length) {
-		addFieldChunks(
-			embed,
-			"Argumentos",
-			plainArgs.map(
-				(a) => `\`${a.name}\`${a.required ? " \\*" : ""} - ${a.description}`,
-			),
+		addDivider(container);
+		const lines = plainArgs.map((a) => {
+			const tag = a.required ? " \\*" : useFlagHint ? ` (--${a.name})` : "";
+			return `- \`${a.name}\`${tag} - ${a.description}`;
+		});
+		container.addTextDisplayComponents((td) =>
+			td.setContent(["**Argumentos**", ...lines].join("\n")),
 		);
 	}
 
-	addRestrictions(embed, cmd);
-	return embed;
+	addRestrictions(container, cmd);
+	return container;
 }
 
 /** View de grupo (`/help <command> <group>`) - lista os subcomandos daquele grupo. */
-function buildGroupEmbed(
+function buildGroupContainer(
 	cmd: CommandDefinition,
 	group: RawOption,
-): EmbedBuilder {
-	const embed = new EmbedBuilder()
-		.setColor(0x5865f2)
-		.setTitle(`/${cmd.name} ${group.name}`)
-		.setDescription(group.description);
+	invokeName: string,
+): ContainerBuilder {
+	const useFlagHint = invokeName !== "/" && config.bot.allowArgsAsFlags;
+	const container = new ContainerBuilder().setAccentColor(ACCENT);
+	const label = commandLabel(invokeName, [cmd.name, group.name]);
+	container.addTextDisplayComponents((td) =>
+		td.setContent(`**${label}**\n${group.description}`),
+	);
 
 	const lines = (group.options ?? [])
 		.filter((s) => s.type === SUB_COMMAND)
-		.map((s) => formatSubcommandLine(cmd.name, [group.name], s));
-	addFieldChunks(embed, "Subcomandos", lines);
-
-	addRestrictions(embed, cmd);
-	return embed;
-}
-
-/** View de folha (`/help <command> [group] <subcommand>`) - os argumentos de um único subcomando. */
-function buildLeafEmbed(
-	cmd: CommandDefinition,
-	path: string[],
-	leaf: RawOption,
-): EmbedBuilder {
-	const embed = new EmbedBuilder()
-		.setColor(0x5865f2)
-		.setTitle(`/${[cmd.name, ...path, leaf.name].join(" ")}`)
-		.setDescription(leaf.description);
-
-	const args = (leaf.options ?? []).filter((o) => ARG_TYPES.includes(o.type));
-	if (args.length) {
-		addFieldChunks(
-			embed,
-			"Argumentos",
-			args.map(
-				(a) =>
-					`- \`${a.name}\`${a.required ? " (obrigatório)" : ""}\n> ${a.description}\n`,
-			),
+		.map((s) =>
+			formatSubcommandLine(invokeName, cmd.name, [group.name], s, useFlagHint),
+		);
+	if (lines.length) {
+		addDivider(container);
+		container.addTextDisplayComponents((td) =>
+			td.setContent(["**Subcomandos**", ...lines].join("\n")),
 		);
 	}
 
-	addRestrictions(embed, cmd);
-	return embed;
+	addRestrictions(container, cmd);
+	return container;
+}
+
+/** View de folha (`/help [group] <subcommand>`) - os argumentos de um único subcomando. */
+function buildLeafContainer(
+	cmd: CommandDefinition,
+	path: string[],
+	leaf: RawOption,
+	invokeName: string,
+): ContainerBuilder {
+	const useFlagHint = invokeName !== "/" && config.bot.allowArgsAsFlags;
+	const container = new ContainerBuilder().setAccentColor(ACCENT);
+	const label = commandLabel(invokeName, [cmd.name, ...path, leaf.name]);
+	container.addTextDisplayComponents((td) =>
+		td.setContent(
+			`**${label}${formatArgList(leaf.options, useFlagHint)}**\n${leaf.description}`,
+		),
+	);
+
+	const args = (leaf.options ?? []).filter((o) => ARG_TYPES.includes(o.type));
+	if (args.length) {
+		addDivider(container);
+		const lines = args.map((a) => {
+			const tag = a.required
+				? "obrigatório"
+				: useFlagHint
+					? `opcional, \`--${a.name}\``
+					: "opcional";
+			return `- \`${a.name}\` (${tag})\n${a.description}`;
+		});
+		container.addTextDisplayComponents((td) =>
+			td.setContent(["**Argumentos**", ...lines].join("\n")),
+		);
+	}
+
+	addRestrictions(container, cmd);
+	return container;
 }
 
 /**
- * Resolve `/help <command> [...path]` no embed certo.
+ * Resolve `/help <command> [...path]` no container certo.
  * `path` vem vazio pro resumo de topo, `[group]` ou `[subcommand]` um nível
  * abaixo, e `[group, subcommand]` pra uma folha dentro de um grupo.
+ * `invokeName` é `"/"` (slash) ou o prefixo do servidor - todo texto de uso gerado
+ * aqui reflete como o comando é chamado de verdade no contexto de quem pediu o help.
  * Retorna `null` se `path` não resolver em nada.
  */
-function buildHelpEmbed(
+function buildHelpContainer(
 	cmd: CommandDefinition,
 	path: string[],
-): EmbedBuilder | null {
+	invokeName: string,
+): ContainerBuilder | null {
 	const json = cmd.options?.toJSON() as { options?: RawOption[] } | undefined;
 	const topLevel = json?.options ?? [];
 
-	if (path.length === 0) return buildSummaryEmbed(cmd, topLevel);
+	if (path.length === 0)
+		return buildSummaryContainer(cmd, topLevel, invokeName);
 
 	const [first, second] = path;
 	const group = topLevel.find(
 		(o) => o.type === SUB_COMMAND_GROUP && o.name === first,
 	);
 	if (group) {
-		if (path.length === 1) return buildGroupEmbed(cmd, group);
+		if (path.length === 1) return buildGroupContainer(cmd, group, invokeName);
 		if (path.length !== 2) return null;
 		const leaf = (group.options ?? []).find(
 			(s) => s.type === SUB_COMMAND && s.name === second,
 		);
-		return leaf ? buildLeafEmbed(cmd, [first], leaf) : null;
+		return leaf ? buildLeafContainer(cmd, [first], leaf, invokeName) : null;
 	}
 
 	const topSub = topLevel.find(
 		(o) => o.type === SUB_COMMAND && o.name === first,
 	);
-	if (topSub && path.length === 1) return buildLeafEmbed(cmd, [], topSub);
+	if (topSub && path.length === 1)
+		return buildLeafContainer(cmd, [], topSub, invokeName);
 
 	return null;
-}
-
-function getVisibleCommands(client: BotClient): CommandDefinition[] {
-	return client.commands
-		.getAll()
-		.filter((c) => c.showOnHelp !== false)
-		.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ─── Command ──────────────────────────────────────────────────────────────────
@@ -270,9 +343,6 @@ export default defineCommand({
 	// ── Slash ─────────────────────────────────────────────────────────────────
 	async executeAsSlash(interaction, client) {
 		const cmdName = interaction.options.getString("command");
-		const prefix = interaction.guild
-			? await getGuildPrefix(interaction.guild.id)
-			: config.bot.defaultPrefix;
 
 		// View de detalhe
 		if (cmdName) {
@@ -284,20 +354,23 @@ export default defineCommand({
 						`Usuário ${interaction.user.id} tentou ver comando oculto: ${cmdName}`,
 					);
 				await interaction.reply({
-					content: `❌ Comando \`${cmdName}\` não encontrado.`,
+					...EmbedFormatter.error(`Comando \`${cmdName}\` não encontrado.`),
 					ephemeral: true,
 				});
 				return;
 			}
-			const embed = buildHelpEmbed(cmd, path);
-			if (!embed) {
+			const container = buildHelpContainer(cmd, path, "/");
+			if (!container) {
 				await interaction.reply({
-					content: `❌ Subcomando \`${cmdName}\` não encontrado.`,
+					...EmbedFormatter.error(`Subcomando \`${cmdName}\` não encontrado.`),
 					ephemeral: true,
 				});
 				return;
 			}
-			await interaction.reply({ embeds: [embed] });
+			await interaction.reply({
+				flags: MessageFlags.IsComponentsV2,
+				components: [container],
+			});
 			return;
 		}
 
@@ -307,7 +380,7 @@ export default defineCommand({
 
 		await interaction.deferReply();
 		const msg = await interaction.editReply(
-			renderList(0, pages > 1, all, pages, prefix),
+			renderList(0, pages > 1, all, pages, "/"),
 		);
 
 		if (pages <= 1) return;
@@ -316,7 +389,7 @@ export default defineCommand({
 			invokerId: interaction.user.id,
 			pages,
 			render: (page, interactive) =>
-				renderList(page, interactive, all, pages, prefix),
+				renderList(page, interactive, all, pages, "/"),
 		});
 	},
 
@@ -336,15 +409,22 @@ export default defineCommand({
 					logger.warn(
 						`Usuário ${message.author.id} tentou ver comando oculto: ${cmdName}`,
 					);
-				await message.reply(`❌ Comando \`${cmdName}\` não encontrado.`);
+				await message.reply(
+					EmbedFormatter.error(`Comando \`${cmdName}\` não encontrado.`),
+				);
 				return;
 			}
-			const embed = buildHelpEmbed(cmd, path);
-			if (!embed) {
-				await message.reply(`❌ Subcomando \`${cmdName}\` não encontrado.`);
+			const container = buildHelpContainer(cmd, path, prefix);
+			if (!container) {
+				await message.reply(
+					EmbedFormatter.error(`Subcomando \`${cmdName}\` não encontrado.`),
+				);
 				return;
 			}
-			await message.reply({ embeds: [embed] });
+			await message.reply({
+				flags: MessageFlags.IsComponentsV2,
+				components: [container],
+			});
 			return;
 		}
 

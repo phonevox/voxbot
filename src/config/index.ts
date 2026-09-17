@@ -67,6 +67,11 @@ export const config = {
 			process.env.DISABLED_COGS?.split(",")
 				.map((name) => name.trim())
 				.filter(Boolean) ?? [],
+
+		// Experimental: deixa comando de prefixo aceitar opção via `--nome`/`--nome=valor` (estilo
+		// CLI), em qualquer posição, além do posicional normal (ver PrefixArgs). Desligado por
+		// padrão até validar em uso real.
+		allowArgsAsFlags: process.env.DEV_ALLOW_ARGS_AS_FLAGS === "true",
 	},
 	// Tudo opcional (undefined se não setado) - o cog zabbix é um módulo específico de uma
 	// integração, não algo que toda instalação do bot precisa ter configurado pra subir.
