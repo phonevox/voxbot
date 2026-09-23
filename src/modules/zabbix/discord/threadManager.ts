@@ -174,7 +174,10 @@ export async function findOrCreateThread(
 		if (classification.isRecovery) {
 			await repo.markResolved(payload.event_id, severity);
 			await setThreadSeverityTag(client, existing.discord_thread_id, RESOLVED_INDEX);
-		} else {
+		} else if (existing.status !== "resolved") {
+			// UPDATE chegando depois do RESOLVED (ex: comentário anexado ao fechamento manual, que
+			// dispara sua própria notificação de update) não deve reabrir a severidade - o evento já
+			// foi resolvido, a tag RESOLVIDO fica.
 			await repo.updateSeverity(payload.event_id, severity);
 			await setThreadSeverityTag(client, existing.discord_thread_id, severity);
 		}
