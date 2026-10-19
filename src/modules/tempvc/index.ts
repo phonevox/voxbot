@@ -10,6 +10,7 @@ import {
 	isGenerator,
 	isTempChannel,
 	listChannels,
+	listGenerators,
 	removeChannel,
 } from "./repository";
 
@@ -60,6 +61,29 @@ export default defineCog({
 		logger.info(
 			`Reconciliados ${rows.length} canal(is) temporário(s), ${dropped} descartado(s) por estarem obsoletos.`,
 		);
+
+		// Quem entrou num gerador enquanto o bot estava offline ficou parado lá -
+		// cria o canal temporário de cada um agora.
+		let created = 0;
+		for (const guild of client.guilds.cache.values()) {
+			for (const generatorId of await listGenerators(guild.id)) {
+				const generator = guild.channels.cache.get(generatorId);
+				if (!generator?.isVoiceBased()) continue;
+
+				for (const member of generator.members.values()) {
+					await createTempChannel(member, generator).catch((err) => {
+						logger.error(err instanceof Error ? err : new Error(String(err)));
+					});
+					created++;
+				}
+			}
+		}
+
+		if (created > 0) {
+			logger.info(
+				`Criados ${created} canal(is) temporário(s) pra quem estava aguardando nos geradores.`,
+			);
+		}
 	},
 });
 
