@@ -10,7 +10,7 @@ services:
       # Sobrescreve o POSTGRES_HOST/PORT do .env - dentro do compose o banco sempre está em "db:5432"
       # (nome do serviço, porta interna padrão do Postgres). Qualquer POSTGRES_PORT no .env é só o
       # port scheme de host/proxy (Dokploy etc) - o container nunca escuta em outra porta.
-      POSTGRES_HOST: db
+      POSTGRES_HOST: voxbot-db
       POSTGRES_PORT: "5432"
     volumes:
       - ./logs:/app/logs
